@@ -1,0 +1,70 @@
+# JetBrains IDE settings
+.idea/
+*.iml
+
+# Build directories (CLion default)
+cmake-build-*/
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+
+# Compiled Object files
+*.o
+*.obj
+*.lo
+*.la
+*.al
+*.libs
+
+# Compiled Dynamic libraries
+*.so
+*.so.*
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+*.run
+
+# Debug files
+*.dSYM/
+*.gcno
+*.gcda
+*.gcov
+
+# Logs and temporary files
+*.log
+*.swp
+*.tmp
+*.bak
+
+# Code coverage files
+coverage/
+*.profraw
+*.profdata
+
+# CCache
+.ccache/
+
+# Valgrind and sanitizers
+vgcore.*
+core
+
+# CLion helper folders
+cmake-build-debug/
+cmake-build-release/
+cmake-build-relwithdebinfo/
+cmake-build-minsizerel/
