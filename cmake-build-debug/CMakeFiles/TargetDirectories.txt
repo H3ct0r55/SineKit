@@ -1,0 +1,3 @@
+/Users/hector/Projects/SineKit/cmake-build-debug/CMakeFiles/SineKit.dir
+/Users/hector/Projects/SineKit/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/hector/Projects/SineKit/cmake-build-debug/CMakeFiles/rebuild_cache.dir
