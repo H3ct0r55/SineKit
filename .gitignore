@@ -71,3 +71,5 @@ cmake-build-minsizerel/
 
 # Testing Files
 test
+
+.DS_Store

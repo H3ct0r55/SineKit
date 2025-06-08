@@ -1,126 +1,114 @@
 #ifndef SINEKIT_LIBRARY_H
 #define SINEKIT_LIBRARY_H
 
-
-#include <stdlib.h>
 #include <fstream>
 #include <filesystem>
 #include <iostream>
 #include <vector>
+#include <cassert>
 
 namespace sk {
-    struct Tag {
-        char v[4];
-    };
+    struct Tag {char v[4];};
     std::ostream& operator<<(std::ostream& os, const Tag& input);
 
     struct RIFFHeader {
-        Tag ChunkID;
-        uint32_t ChunkSize;
-        Tag Format;
+        Tag             ChunkID         {{'R','I','F','F'}};
+        std::uint32_t   ChunkSize       {0};
+        Tag             Format          {{'W','A','V','E'}};
 
-        void readRIFFHeader(std::ifstream& file);
-        void writeRIFFHeader(std::ofstream& file);
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
     };
     std::ostream& operator<<(std::ostream& os, const RIFFHeader& input);
 
     struct FMTHeader {
-        Tag Subchunk1ID;
-        uint32_t Subchunk1Size;
-        uint16_t AudioFormat;
-        uint16_t NumChannels;
-        uint32_t SampleRate;
-        uint32_t ByteRate;
-        uint16_t BlockAlign;
-        uint16_t BitsPerSample;
-        void readFMTHeader(std::ifstream& file);
-        void writeFMTHeader(std::ofstream& file);
+        Tag             Subchunk1ID     {{'f','m','t',' '}};
+        std::uint32_t   Subchunk1Size   {16};
+        std::uint16_t   AudioFormat     {1};
+        std::uint16_t   NumChannels     {0};
+        std::uint32_t   SampleRate      {0};
+        std::uint32_t   ByteRate        {0};
+        std::uint16_t   BlockAlign      {0};
+        std::uint16_t   BitsPerSample   {0};
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
     };
     std::ostream& operator<<(std::ostream& os, const FMTHeader& input);
 
     struct WAVDataHeader {
-        Tag Subchunk2ID;
-        uint32_t Subchunk2Size;
-        void readWAVDataHeader(std::ifstream& file);
-        void writeWAVDataHeader(std::ofstream& file);
+        Tag             Subchunk2ID     {{'d','a','t','a'}};
+        std::uint32_t   Subchunk2Size   {0};
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
     };
     std::ostream& operator<<(std::ostream& os, const WAVDataHeader& input);
 
     struct WAVHeader {
-        RIFFHeader m_RIFFHeader;
-        FMTHeader m_FMTHeader;
-        WAVDataHeader m_WAVDataHeader;
-        void readWAVHeader(std::ifstream& file);
-        void writeWAVHeader(std::ofstream& file);
-        void updateWAVHeader(unsigned int bitDepth, unsigned int sampleRate, unsigned int numChannels, unsigned int numFrames);
+        RIFFHeader      riff;
+        FMTHeader       fmt;
+        WAVDataHeader   data;
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
+        void update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat);
     };
 
-    enum AudioType {
-        T_UDEF,
-        T_PCM,
-        T_DSD
+    enum class AudioType {Undefined, PCM, DSD};
+
+    enum class BitType : std::uint16_t { Undefined = 0, I16 = 16, I24 = 24, F32 = 32, F64 = 64 };
+
+    enum class SampleRate : std::uint32_t {
+        Undefined   =   0,
+        P22K05      =   22050,
+        P32K        =   32000,
+        P44K1       =   44100,
+        P48K        =   48000,
+        P88K2       =   88200,
+        P96K        =   96000,
+        P176K4      =   176400,
+        P192K       =   192000,
+        DSD64       =   2822400,
+        DSD128      =   5644800,
+        DSD256      =   11289600,
+        DSD512      =   22579200
     };
 
-    enum BitType {
-        T_16I,
-        T_24I,
-        T_32I,
-        T_32F,
-        T_64F
-    };
-
-    template<typename SampleType>
+    template<typename T>
     struct AudioBuffer {
-        size_t numFrames;
-        size_t numChannels;
+        std::vector<std::vector<T>> channels;
 
-        std::vector<std::vector<SampleType>> channels;
-
-        void resize(size_t numCh, size_t frames) {
-            numFrames = frames;
-            numChannels = numCh;
-
-            channels.resize(numChannels);
-            for (auto &ch : channels)
-                ch.resize(numFrames);
-
+        void resize(std::size_t numChannels, size_t numFrames) {
+            channels.assign(numChannels, std::vector<T>(numFrames));
         }
+        [[nodiscard]] std::size_t numChannels() const { return channels.size();};
+        [[nodiscard]] std::size_t numFrames() const { return channels.is_empty() ? 0 : channels.front.size();};
 
-        void clear() {
-            for (auto &ch : channels)
-                ch.clear();
-            channels.clear();
-            numFrames = 0;
-            numChannels = 0;
-        }
-
-        SampleType& sample(size_t ch, size_t frame) {
-            return channels[ch][frame];
-        }
+        T&       operator()(std::size_t c, std::size_t f)       { return channels[c][f]; }
+        const T& operator()(std::size_t c, std::size_t f) const { return channels[c][f]; }
     };
 
     class SineKit {
-        WAVHeader m_WAVHeader;
-        AudioType audioType;
-        BitType bitType;
-        unsigned int pcmBitDepth;
-        unsigned int pcmSampleRate;
-        unsigned int dsdOversamplingRate;
-        unsigned int numChannels;
-        unsigned int numFrames;
-        AudioBuffer<int16_t> pcmBuffer16;
-        AudioBuffer<int32_t> pcmBuffer24;
-        AudioBuffer<int32_t> pcmBuffer32;
-        AudioBuffer<float> pcmBuffer32f;
-        AudioBuffer<double> pcmBuffer64f;
+    private:
+        WAVHeader               WAVHeader_;
+        AudioType               AudioType_      {AudioType::Undefined};
+        BitType                 BitType_        {BitType::Undefined};
+        SampleRate              SampleRate_     {SampleRate::Undefined};
+        std::uint16_t           NumChannels_    {0};
+        std::uint32_t           NumFrames_      {0};
+        AudioBuffer<int16_t>    Buffer16_;
+        AudioBuffer<int32_t>    Buffer24_;
+        AudioBuffer<float>      Buffer32f_;
+        AudioBuffer<double>     Buffer64f_;
+
+        template<typename T>
+        static void readInterleaved (std::ifstream&, AudioBuffer<T>&, std::size_t frames, std::size_t ch);
+
+        template<typename T>
+        static void writeInterleaved(std::ofstream&, const AudioBuffer<T>&, std::size_t frames, std::size_t ch);
 
     public:
-        SineKit();
-        SineKit(AudioType type, unsigned int number_channels);
 
-        void loadFile(std::filesystem::path input_path);
-        void writeFile(std::filesystem::path output_path);
-        void convertToFormat(BitType bitType);
+        void loadFile(const std::filesystem::path& input_path);
+        void writeFile(const std::filesystem::path& output_path) const;
         void updateHeaders();
     };
 
