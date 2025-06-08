@@ -40,6 +40,20 @@ void sk::FMTHeader::write(std::ofstream& file) const {
 }
 
 
+void sk::FACTHeader::read(std::ifstream& file) {
+    file.read(ChunkID.v, sizeof(ChunkID.v));
+    file.read(reinterpret_cast<char*>(&ChunkSize), sizeof(ChunkSize));
+    file.read(reinterpret_cast<char*>(&NumSamples), sizeof(NumSamples));
+    if (!file) throw std::runtime_error("FACTHeader header read failed");
+}
+
+void sk::FACTHeader::write(std::ofstream& file) const {
+    file.write(ChunkID.v, sizeof(ChunkID.v));
+    file.write(reinterpret_cast<const char*>(&ChunkSize), sizeof(ChunkSize));
+    file.write(reinterpret_cast<const char*>(&NumSamples), sizeof(NumSamples));
+}
+
+
 // ─── WAV DATA helpers ─────────────────────────────────────────────────────
 void sk::WAVDataHeader::read(std::ifstream& file) {
     file.read(Subchunk2ID.v, sizeof(Subchunk2ID.v));
@@ -52,16 +66,73 @@ void sk::WAVDataHeader::write(std::ofstream& file) const {
     file.write(reinterpret_cast<const char*>(&Subchunk2Size), sizeof(Subchunk2Size));
 }
 
+bool verifyFMT(std::ifstream& file) {
+    char readData[4];
+    file.read(readData, sizeof(readData));
+    if (!file) return false;
+    file.seekg(-4, std::ios::cur);
+    for (int i = 0; i < 4; i++) {
+        std::cout << readData[i];
+    }
+    std::cout << std::endl;
+    return readData[0] == 'f' && readData[1] == 'm' &&
+           readData[2] == 't' && readData[3] == ' ';
+}
+
+bool verifyFact(std::ifstream& file) {
+    char readData[4];
+    file.read(readData, sizeof(readData));
+    if (!file) return false;
+    file.seekg(-4, std::ios::cur);
+    for (int i = 0; i < 4; i++) {
+        std::cout << readData[i];
+    }
+    std::cout << std::endl;
+    return readData[0] == 'f' && readData[1] == 'a' &&
+           readData[2] == 'c' && readData[3] == 't';
+}
+
+bool verifyData(std::ifstream& file) {
+    char readData[4];
+    file.read(readData, sizeof(readData));
+    if (!file) return false;
+    file.seekg(-4, std::ios::cur);
+    for (int i = 0; i < 4; i++) {
+        std::cout << readData[i];
+    }
+    std::cout << std::endl;
+    return readData[0] == 'd' && readData[1] == 'a' &&
+           readData[2] == 't' && readData[3] == 'a';
+}
+
 // ─── WAV HEADER helpers ───────────────────────────────────────────────────
 void sk::WAVHeader::read(std::ifstream& file) {
     riff.read(file);
+    while (!verifyFMT(file)) {
+        file.seekg(1, std::ios::cur);
+    }
+    std::cout << "Broken FMT" << std::endl;
     fmt.read(file);
+    while (!verifyFact(file) && !verifyData(file)) {
+        file.seekg(1, std::ios::cur);
+    }
+    std::cout << "Broken Fact/Data" << std::endl;
+    if (verifyFact(file)) {
+        fact.read(file);
+    }
+    while (!verifyData(file)) {
+        file.seekg(1, std::ios::cur);
+    }
+    std::cout << "Broken Data" << std::endl;
     data.read(file);
 }
 
 void sk::WAVHeader::write(std::ofstream& file) const {
     riff.write(file);
     fmt.write(file);
+    if (fmt.AudioFormat == 3) {
+        fact.write(file);
+    }
     data.write(file);
 }
 
@@ -77,6 +148,8 @@ void sk::WAVHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std
     fmt.ByteRate = sampleRate * fmt.BlockAlign;
     fmt.BitsPerSample = bitDepth;
 
+    fact.NumSamples = numFrames;
+
     data.Subchunk2Size = numFrames * fmt.BlockAlign;
     riff.ChunkSize = data.Subchunk2Size + data.Subchunk2Size;
 
@@ -86,15 +159,39 @@ template<typename T>
 void sk::SineKit::readInterleaved(std::ifstream& in, AudioBuffer<T>& dst,
                               std::size_t frames, std::size_t ch)
 {
-    std::vector<T> inter(frames * ch);
-    in.read(reinterpret_cast<char*>(inter.data()),
-            static_cast<std::streamsize>(inter.size() * sizeof(T)));
-    if(!in) throw std::runtime_error("PCM payload short");
-
     dst.resize(ch, frames);
-    for(std::size_t f=0; f<frames; ++f)
-        for(std::size_t c=0; c<ch; ++c)
-            dst(c,f) = inter[f*ch + c];
+
+    if constexpr (std::is_same_v<T, std::int32_t>) {
+        // 24‑bit PCM → 32‑bit container (3‑byte little‑endian to signed 4‑byte)
+        std::array<std::uint8_t, 3> trip{};
+        for (std::size_t f = 0; f < frames; ++f) {
+            for (std::size_t c = 0; c < ch; ++c) {
+                in.read(reinterpret_cast<char*>(trip.data()), 3);
+                if (!in)
+                    throw std::runtime_error("PCM payload short (24‑bit read)");
+
+                std::int32_t v = (static_cast<std::int32_t>(trip[2]) << 16) |
+                                 (static_cast<std::int32_t>(trip[1]) << 8)  |
+                                 (static_cast<std::int32_t>(trip[0]));
+
+                // Sign‑extend 24‑bit value to 32‑bit
+                if (v & 0x00800000) v |= 0xFF000000;
+
+                dst(c, f) = v;
+            }
+        }
+    } else {
+        // Other formats: read directly as tightly packed interleaved data
+        std::vector<T> inter(frames * ch);
+        in.read(reinterpret_cast<char*>(inter.data()),
+                static_cast<std::streamsize>(inter.size() * sizeof(T)));
+        if (!in)
+            throw std::runtime_error("PCM payload short");
+
+        for (std::size_t f = 0; f < frames; ++f)
+            for (std::size_t c = 0; c < ch; ++c)
+                dst(c, f) = inter[f * ch + c];
+    }
 }
 
 template<typename T>

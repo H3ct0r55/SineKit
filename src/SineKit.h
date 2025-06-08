@@ -6,6 +6,9 @@
 #include <iostream>
 #include <vector>
 #include <cassert>
+#include <type_traits>
+#include <cstring>
+#include <string>
 
 namespace sk {
     struct Tag {char v[4];};
@@ -35,6 +38,14 @@ namespace sk {
     };
     std::ostream& operator<<(std::ostream& os, const FMTHeader& input);
 
+    struct FACTHeader {
+        Tag             ChunkID         {{'f','a','c','t'}};
+        std::uint32_t   ChunkSize       {4};
+        std::uint32_t   NumSamples       {0};
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
+    };
+
     struct WAVDataHeader {
         Tag             Subchunk2ID     {{'d','a','t','a'}};
         std::uint32_t   Subchunk2Size   {0};
@@ -46,6 +57,7 @@ namespace sk {
     struct WAVHeader {
         RIFFHeader      riff;
         FMTHeader       fmt;
+        FACTHeader       fact;
         WAVDataHeader   data;
         void read(std::ifstream& file);
         void write(std::ofstream& file) const;
