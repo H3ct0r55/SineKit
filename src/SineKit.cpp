@@ -66,6 +66,22 @@ void sk::WAVDataHeader::write(std::ofstream& file) const {
     file.write(reinterpret_cast<const char*>(&Subchunk2Size), sizeof(Subchunk2Size));
 }
 
+int verifyChunk(std::ifstream& file) {
+    char readData[4];
+    file.read(readData, sizeof(readData));
+    if (!file) return false;
+    file.seekg(-4, std::ios::cur);
+    for (int i = 0; i < 4; i++) {
+        std::cout << readData[i];
+    }
+    std::cout << std::endl;
+    if (std::memcmp(readData, "RIFF", 4) == 0) return 1;
+    if (std::memcmp(readData, "fmt ", 4) == 0) return 2;
+    if (std::memcmp(readData, "fact", 4) == 0) return 3;
+    if (std::memcmp(readData, "data", 4) == 0) return 4;
+    return 0;
+}
+
 bool verifyFMT(std::ifstream& file) {
     char readData[4];
     file.read(readData, sizeof(readData));
@@ -107,24 +123,74 @@ bool verifyData(std::ifstream& file) {
 
 // ─── WAV HEADER helpers ───────────────────────────────────────────────────
 void sk::WAVHeader::read(std::ifstream& file) {
-    riff.read(file);
+    bool foundRIFF = false;
+    bool foundFMT = false;
+    bool foundFact = false;
+    bool foundData = false;
+    while (!foundRIFF || !foundFMT || !foundFact || !foundData) {
+        switch (verifyChunk(file)) {
+            case 1 : {
+                if (!foundRIFF) {
+                    foundRIFF = true;
+                    riff.read(file);
+                    std::cout << "Found RIFF header" << std::endl;
+                    break;
+                }
+                throw std::runtime_error("Multiple RIFF headers found, invalid file");
+            }
+            case 2 : {
+                if (!foundFMT) {
+                    foundFMT = true;
+                    fmt.read(file);
+                    std::cout << "Found FMT header" << std::endl;
+                    break;
+                }
+                throw std::runtime_error("Multiple FMT headers found, invalid file");
+            }
+            case 3 : {
+                if (!foundFact) {
+                    foundFact = true;
+                    fact.read(file);
+                    std::cout << "Found Fact header" << std::endl;
+                    break;
+                }
+                throw std::runtime_error("Multiple FACT headers found, invalid file");
+            }
+            case 4 : {
+                if (!foundData) {
+                    foundData = true;
+                    data.read(file);
+                    std::cout << "Found data header" << std::endl;
+                    break;
+                }
+                throw std::runtime_error("Multiple DATA headers found, invalid file");
+            }
+            default: {
+                file.seekg(1, std::ios::cur);
+                break;
+            }
+        }
+
+        if (foundRIFF && foundFMT && foundData && fmt.AudioFormat != 3) {
+            foundFact = true;
+            std::cout << "Skipping Fact Header" << std::endl;
+        }
+    }
+    /*riff.read(file);
     while (!verifyFMT(file)) {
         file.seekg(1, std::ios::cur);
     }
-    std::cout << "Broken FMT" << std::endl;
     fmt.read(file);
     while (!verifyFact(file) && !verifyData(file)) {
         file.seekg(1, std::ios::cur);
     }
-    std::cout << "Broken Fact/Data" << std::endl;
     if (verifyFact(file)) {
         fact.read(file);
     }
     while (!verifyData(file)) {
         file.seekg(1, std::ios::cur);
     }
-    std::cout << "Broken Data" << std::endl;
-    data.read(file);
+    data.read(file);*/
 }
 
 void sk::WAVHeader::write(std::ofstream& file) const {
@@ -151,7 +217,7 @@ void sk::WAVHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std
     fact.NumSamples = numFrames;
 
     data.Subchunk2Size = numFrames * fmt.BlockAlign;
-    riff.ChunkSize = data.Subchunk2Size + data.Subchunk2Size;
+    riff.ChunkSize = 24 + 8 + fmt.Subchunk1Size + data.Subchunk2Size + (fmt.AudioFormat == 3 ? 12 : 0);
 
 }
 
