@@ -1,3 +1,4 @@
+#pragma once
 #ifndef SINEKIT_LIBRARY_H
 #define SINEKIT_LIBRARY_H
 
@@ -6,6 +7,9 @@
 #include <iostream>
 #include <vector>
 #include <cassert>
+#include "EndianHelpers.h"
+#include "Extended80.h"
+#include <bit>
 #include <type_traits>
 #include <cstring>
 #include <string>
@@ -64,6 +68,35 @@ namespace sk {
         void update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat);
     };
 
+    struct FORMHeader {
+        Tag             ChunkID     {{'F','O','R','M'}};
+        std::uint32_t   ChunkSize   {0};
+        Tag             FormType    {{'A','I','F','F'}};
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
+    };
+    std::ostream& operator<<(std::ostream& os, const FORMHeader& input);
+
+    struct COMMHeader {
+        Tag             ChunkID     {{'C','O','M','M'}};
+        std::int32_t    ChunkSize   {0};
+        std::int16_t    NumChannels {0};
+        std::uint32_t   NumSamples  {0};
+        std::int16_t    BitDepth    {0};
+        sk::Extended80  SampleRate   {};
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
+    };
+    std::ostream& operator<<(std::ostream& os, const COMMHeader& input);
+
+    struct AIFFHeader {
+        FORMHeader      form;
+        COMMHeader      comm;
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
+    };
+    std::ostream& operator<<(std::ostream& os, const AIFFHeader& input);
+
     enum class AudioType {Undefined, PCM, DSD};
 
     enum class BitType : std::uint16_t { Undefined = 0, I16 = 16, I24 = 24, F32 = 32, F64 = 64 };
@@ -101,6 +134,7 @@ namespace sk {
     class SineKit {
     private:
         WAVHeader               WAVHeader_;
+        AIFFHeader              AIFFHeader_;
         AudioType               AudioType_      {AudioType::Undefined};
         BitType                 BitType_        {BitType::Undefined};
         SampleRate              SampleRate_     {SampleRate::Undefined};
@@ -112,10 +146,10 @@ namespace sk {
         AudioBuffer<double>     Buffer64f_;
 
         template<typename T>
-        static void readInterleaved (std::ifstream&, AudioBuffer<T>&, std::size_t frames, std::size_t ch);
+        static void readInterleaved (std::ifstream&, AudioBuffer<T>&, std::size_t frames, std::size_t ch, sk::endian::Endian fileEndian);
 
         template<typename T>
-        static void writeInterleaved(std::ofstream&, const AudioBuffer<T>&, std::size_t frames, std::size_t ch);
+        static void writeInterleaved(std::ofstream&, const AudioBuffer<T>&, std::size_t frames, std::size_t ch, sk::endian::Endian fileEndian);
 
     public:
 

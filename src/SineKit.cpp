@@ -1,16 +1,23 @@
 #include "SineKit.h"
 
+std::ostream& sk::operator<<(std::ostream& os, const sk::Tag& input) {
+    for (int i = 0; i < 4; i++) {
+        os << input.v[i];
+    }
+    return os;
+}
+
 // ─── RIFF helpers ─────────────────────────────────────────────────────────
 void sk::RIFFHeader::read(std::ifstream& file) {
     file.read(ChunkID.v, sizeof(ChunkID.v));
-    file.read(reinterpret_cast<char*>(&ChunkSize), sizeof(ChunkSize));
+    ChunkSize = sk::endian::read_le<decltype(ChunkSize)>(file);
     file.read(Format.v, sizeof(Format.v));
     if(!file) throw std::runtime_error("RIFF header read failed");
 }
 
 void sk::RIFFHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
-    file.write(reinterpret_cast<const char*>(&ChunkSize), sizeof(ChunkSize));
+    sk::endian::write_le<decltype(ChunkSize)>(file, ChunkSize);
     file.write(Format.v, sizeof(Format.v));
 }
 
@@ -18,55 +25,57 @@ void sk::RIFFHeader::write(std::ofstream& file) const {
 // ─── FMT helpers ──────────────────────────────────────────────────────────
 void sk::FMTHeader::read(std::ifstream& file) {
     file.read(Subchunk1ID.v, sizeof(Subchunk1ID.v));
-    file.read(reinterpret_cast<char*>(&Subchunk1Size), sizeof(Subchunk1Size));
-    file.read(reinterpret_cast<char*>(&AudioFormat), sizeof(AudioFormat));
-    file.read(reinterpret_cast<char*>(&NumChannels), sizeof(NumChannels));
-    file.read(reinterpret_cast<char*>(&SampleRate), sizeof(SampleRate));
-    file.read(reinterpret_cast<char*>(&ByteRate), sizeof(ByteRate));
-    file.read(reinterpret_cast<char*>(&BlockAlign), sizeof(BlockAlign));
-    file.read(reinterpret_cast<char*>(&BitsPerSample), sizeof(BitsPerSample));
+
+    Subchunk1Size = sk::endian::read_le<decltype(Subchunk1Size)>(file);
+    AudioFormat = sk::endian::read_le<decltype(AudioFormat)>(file);
+    NumChannels = sk::endian::read_le<decltype(NumChannels)>(file);
+    SampleRate = sk::endian::read_le<decltype(SampleRate)>(file);
+    ByteRate = sk::endian::read_le<decltype(ByteRate)>(file);
+    BlockAlign = sk::endian::read_le<decltype(BlockAlign)>(file);
+    BitsPerSample = sk::endian::read_le<decltype(BitsPerSample)>(file);
+
     if (!file) throw std::runtime_error("FMTHeader header read failed");
 }
 
 void sk::FMTHeader::write(std::ofstream& file) const {
     file.write(Subchunk1ID.v, sizeof(Subchunk1ID.v));
-    file.write(reinterpret_cast<const char*>(&Subchunk1Size), sizeof(Subchunk1Size));
-    file.write(reinterpret_cast<const char*>(&AudioFormat), sizeof(AudioFormat));
-    file.write(reinterpret_cast<const char*>(&NumChannels), sizeof(NumChannels));
-    file.write(reinterpret_cast<const char*>(&SampleRate), sizeof(SampleRate));
-    file.write(reinterpret_cast<const char*>(&ByteRate), sizeof(ByteRate));
-    file.write(reinterpret_cast<const char*>(&BlockAlign), sizeof(BlockAlign));
-    file.write(reinterpret_cast<const char*>(&BitsPerSample), sizeof(BitsPerSample));
+    sk::endian::write_le<decltype(Subchunk1Size)>(file, Subchunk1Size);
+    sk::endian::write_le<decltype(AudioFormat)>(file, AudioFormat);
+    sk::endian::write_le<decltype(NumChannels)>(file, NumChannels);
+    sk::endian::write_le<decltype(SampleRate)>(file, SampleRate);
+    sk::endian::write_le<decltype(ByteRate)>(file, ByteRate);
+    sk::endian::write_le<decltype(BlockAlign)>(file, BlockAlign);
+    sk::endian::write_le<decltype(BitsPerSample)>(file, BitsPerSample);
 }
 
 
 void sk::FACTHeader::read(std::ifstream& file) {
     file.read(ChunkID.v, sizeof(ChunkID.v));
-    file.read(reinterpret_cast<char*>(&ChunkSize), sizeof(ChunkSize));
-    file.read(reinterpret_cast<char*>(&NumSamples), sizeof(NumSamples));
+    ChunkSize = sk::endian::read_le<decltype(ChunkSize)>(file);
+    NumSamples = sk::endian::read_le<decltype(NumSamples)>(file);
     if (!file) throw std::runtime_error("FACTHeader header read failed");
 }
 
 void sk::FACTHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
-    file.write(reinterpret_cast<const char*>(&ChunkSize), sizeof(ChunkSize));
-    file.write(reinterpret_cast<const char*>(&NumSamples), sizeof(NumSamples));
+    sk::endian::write_le<decltype(ChunkSize)>(file, ChunkSize);
+    sk::endian::write_le<decltype(NumSamples)>(file, NumSamples);
 }
 
 
 // ─── WAV DATA helpers ─────────────────────────────────────────────────────
 void sk::WAVDataHeader::read(std::ifstream& file) {
     file.read(Subchunk2ID.v, sizeof(Subchunk2ID.v));
-    file.read(reinterpret_cast<char*>(&Subchunk2Size), sizeof(Subchunk2Size));
+    Subchunk2Size = sk::endian::read_le<decltype(Subchunk2Size)>(file);
     if (!file) throw std::runtime_error("WAV DATA header read failed");
 }
 
 void sk::WAVDataHeader::write(std::ofstream& file) const {
     file.write(Subchunk2ID.v, sizeof(Subchunk2ID.v));
-    file.write(reinterpret_cast<const char*>(&Subchunk2Size), sizeof(Subchunk2Size));
+    sk::endian::write_le<decltype(Subchunk2Size)>(file, Subchunk2Size);
 }
 
-int verifyChunk(std::ifstream& file) {
+int verifyWAVChunk(std::ifstream& file) {
     char readData[4];
     file.read(readData, sizeof(readData));
     if (!file) return false;
@@ -81,46 +90,6 @@ int verifyChunk(std::ifstream& file) {
     if (std::memcmp(readData, "data", 4) == 0) return 4;
     return 0;
 }
-
-bool verifyFMT(std::ifstream& file) {
-    char readData[4];
-    file.read(readData, sizeof(readData));
-    if (!file) return false;
-    file.seekg(-4, std::ios::cur);
-    for (int i = 0; i < 4; i++) {
-        std::cout << readData[i];
-    }
-    std::cout << std::endl;
-    return readData[0] == 'f' && readData[1] == 'm' &&
-           readData[2] == 't' && readData[3] == ' ';
-}
-
-bool verifyFact(std::ifstream& file) {
-    char readData[4];
-    file.read(readData, sizeof(readData));
-    if (!file) return false;
-    file.seekg(-4, std::ios::cur);
-    for (int i = 0; i < 4; i++) {
-        std::cout << readData[i];
-    }
-    std::cout << std::endl;
-    return readData[0] == 'f' && readData[1] == 'a' &&
-           readData[2] == 'c' && readData[3] == 't';
-}
-
-bool verifyData(std::ifstream& file) {
-    char readData[4];
-    file.read(readData, sizeof(readData));
-    if (!file) return false;
-    file.seekg(-4, std::ios::cur);
-    for (int i = 0; i < 4; i++) {
-        std::cout << readData[i];
-    }
-    std::cout << std::endl;
-    return readData[0] == 'd' && readData[1] == 'a' &&
-           readData[2] == 't' && readData[3] == 'a';
-}
-
 // ─── WAV HEADER helpers ───────────────────────────────────────────────────
 void sk::WAVHeader::read(std::ifstream& file) {
     bool foundRIFF = false;
@@ -128,7 +97,7 @@ void sk::WAVHeader::read(std::ifstream& file) {
     bool foundFact = false;
     bool foundData = false;
     while (!foundRIFF || !foundFMT || !foundFact || !foundData) {
-        switch (verifyChunk(file)) {
+        switch (verifyWAVChunk(file)) {
             case 1 : {
                 if (!foundRIFF) {
                     foundRIFF = true;
@@ -166,7 +135,7 @@ void sk::WAVHeader::read(std::ifstream& file) {
                 throw std::runtime_error("Multiple DATA headers found, invalid file");
             }
             default: {
-                file.seekg(1, std::ios::cur);
+                file.seekg(2, std::ios::cur);
                 break;
             }
         }
@@ -176,22 +145,8 @@ void sk::WAVHeader::read(std::ifstream& file) {
             std::cout << "Skipping Fact Header" << std::endl;
         }
     }
-    /*riff.read(file);
-    while (!verifyFMT(file)) {
-        file.seekg(1, std::ios::cur);
-    }
-    fmt.read(file);
-    while (!verifyFact(file) && !verifyData(file)) {
-        file.seekg(1, std::ios::cur);
-    }
-    if (verifyFact(file)) {
-        fact.read(file);
-    }
-    while (!verifyData(file)) {
-        file.seekg(1, std::ios::cur);
-    }
-    data.read(file);*/
 }
+
 
 void sk::WAVHeader::write(std::ofstream& file) const {
     riff.write(file);
@@ -202,12 +157,116 @@ void sk::WAVHeader::write(std::ofstream& file) const {
     data.write(file);
 }
 
+void sk::FORMHeader::read(std::ifstream& file) {
+    file.read(ChunkID.v, sizeof(ChunkID.v));
+    ChunkSize = sk::endian::read_be<decltype(ChunkSize)>(file);
+    file.read(FormType.v, sizeof(FormType.v));
+}
+
+void sk::FORMHeader::write(std::ofstream& file) const {
+    file.write(ChunkID.v, sizeof(ChunkID.v));
+    sk::endian::write_be<decltype(ChunkSize)>(file, ChunkSize);
+    file.write(FormType.v, sizeof(FormType.v));
+}
+std::ostream& sk::operator<<(std::ostream& os, const sk::FORMHeader& input) {
+    os << "FORM Header" << std::endl;
+    os << "Chunk ID: " << input.ChunkID << std::endl;
+    os << "Chunk Size: " << input.ChunkSize << std::endl;
+    os << "Form Type: " << input.FormType << std::endl;
+    return os;
+}
+
+void sk::COMMHeader::read(std::ifstream& file) {
+    file.read(ChunkID.v, sizeof(ChunkID.v));
+    ChunkSize = sk::endian::read_be<decltype(ChunkSize)>(file);
+    NumChannels = sk::endian::read_be<decltype(NumChannels)>(file);
+    NumSamples = sk::endian::read_be<decltype(NumSamples)>(file);
+    BitDepth = sk::endian::read_be<decltype(BitDepth)>(file);
+    sk::endian::read_be(file, SampleRate);
+}
+
+void sk::COMMHeader::write(std::ofstream& file) const {
+    file.write(ChunkID.v, sizeof(ChunkID.v));
+    sk::endian::write_be<decltype(ChunkSize)>(file, ChunkSize);
+    sk::endian::write_be<decltype(NumChannels)>(file, NumChannels);
+    sk::endian::write_be<decltype(NumSamples)>(file, NumSamples);
+    sk::endian::write_be<decltype(BitDepth)>(file, BitDepth);
+    sk::endian::write_be(file, SampleRate);
+}
+std::ostream &sk::operator<<(std::ostream &os, const COMMHeader &input) {
+    os << "COMM Header" << std::endl;
+    os << "Chunk ID: " << input.ChunkID << std::endl;
+    os << "Chunk Size: " << input.ChunkSize << std::endl;
+    os << "Num Channels: " << input.NumChannels << std::endl;
+    os << "Num Samples: " << input.NumSamples << std::endl;
+    os << "BitDepth: " << input.BitDepth << std::endl;
+    os << "SampleRate: " << input.SampleRate.to_double() << std::endl;
+    return os;
+}
+
+
+int verifyAIFFChunk(std::ifstream& file) {
+    char readData[4];
+    file.read(readData, sizeof(readData));
+    if (!file) return false;
+    file.seekg(-4, std::ios::cur);
+    for (int i = 0; i < 4; i++) {
+        std::cout << readData[i];
+    }
+    std::cout << std::endl;
+    if (std::memcmp(readData, "FORM", 4) == 0) return 1;
+    if (std::memcmp(readData, "COMM", 4) == 0) return 2;
+    return 0;
+}
+
+void sk::AIFFHeader::read(std::ifstream& file) {
+    bool foundFORM = false;
+    bool foundCOMM = false;
+    while (!foundFORM || !foundCOMM) {
+        switch (verifyAIFFChunk(file)) {
+            case 1 : {
+                if (!foundFORM) {
+                    foundFORM = true;
+                    form.read(file);
+                    std::cout << "Found FORM header" << std::endl;
+                    break;
+                }
+                throw std::runtime_error("Multiple FORM headers found, invalid file");
+            }
+            case 2 : {
+                if (!foundCOMM) {
+                    foundCOMM = true;
+                    comm.read(file);
+                    std::cout << "Found COMM header" << std::endl;
+                    break;
+                }
+                throw std::runtime_error("Multiple COMM headers found, invalid file");
+            }
+            default: {
+                file.seekg(2, std::ios::cur);
+            }
+        }
+    }
+}
+
+std::ostream& sk::operator<<(std::ostream& os, const sk::AIFFHeader& aiff) {
+    os << "AIFF Header" << std::endl;
+    os << aiff.form;
+    os << aiff.comm;
+    return os;
+}
+
+void sk::AIFFHeader::write(std::ofstream& file) const {
+
+}
+
 void sk::SineKit::updateHeaders() {
     WAVHeader_.update(static_cast<std::uint16_t>(BitType_), static_cast<uint32_t>(SampleRate_), NumChannels_, NumFrames_, (BitType_ == BitType::F32 || BitType_ == BitType::F64));
 }
 
 void sk::WAVHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat) {
     fmt.AudioFormat = isFloat ? 3 : 1;
+    std::cout << fmt.AudioFormat << std::endl;
     fmt.NumChannels = numChannels;
     fmt.SampleRate = sampleRate;
     fmt.BlockAlign = numChannels * bitDepth / 8;
@@ -217,13 +276,16 @@ void sk::WAVHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std
     fact.NumSamples = numFrames;
 
     data.Subchunk2Size = numFrames * fmt.BlockAlign;
-    riff.ChunkSize = 24 + 8 + fmt.Subchunk1Size + data.Subchunk2Size + (fmt.AudioFormat == 3 ? 12 : 0);
+    riff.ChunkSize = 4 + (8 + fmt.Subchunk1Size) + (8 + data.Subchunk2Size) + (fmt.AudioFormat == 3 ? 12 : 0);
 
 }
 
 template<typename T>
-void sk::SineKit::readInterleaved(std::ifstream& in, AudioBuffer<T>& dst,
-                              std::size_t frames, std::size_t ch)
+void sk::SineKit::readInterleaved(std::ifstream& in,
+                                  AudioBuffer<T>& dst,
+                                  std::size_t frames,
+                                  std::size_t ch,
+                                  sk::endian::Endian fileEndian)
 {
     dst.resize(ch, frames);
 
@@ -236,14 +298,18 @@ void sk::SineKit::readInterleaved(std::ifstream& in, AudioBuffer<T>& dst,
                 if (!in)
                     throw std::runtime_error("PCM payload short (24‑bit read)");
 
-                std::int32_t v = (static_cast<std::int32_t>(trip[2]) << 16) |
-                                 (static_cast<std::int32_t>(trip[1]) << 8)  |
-                                 (static_cast<std::int32_t>(trip[0]));
-
-                // Sign‑extend 24‑bit value to 32‑bit
-                if (v & 0x00800000) v |= 0xFF000000;
-
-                dst(c, f) = v;
+                std::uint32_t v32;
+                if (fileEndian == sk::endian::Endian::Little)
+                    v32 =  (static_cast<std::uint32_t>(trip[2]) << 16) |
+                           (static_cast<std::uint32_t>(trip[1]) <<  8) |
+                           (static_cast<std::uint32_t>(trip[0]));
+                else
+                    v32 =  (static_cast<std::uint32_t>(trip[0]) << 16) |
+                           (static_cast<std::uint32_t>(trip[1]) <<  8) |
+                           (static_cast<std::uint32_t>(trip[2]));
+                // sign‑extend
+                if (v32 & 0x00800000) v32 |= 0xFF000000;
+                dst(c, f) = static_cast<std::int32_t>(v32);
             }
         }
     } else {
@@ -254,6 +320,14 @@ void sk::SineKit::readInterleaved(std::ifstream& in, AudioBuffer<T>& dst,
         if (!in)
             throw std::runtime_error("PCM payload short");
 
+        for (auto& v : inter) {
+            if constexpr (sizeof(T) != 1) {
+                v = (fileEndian == sk::endian::Endian::Little)
+                        ? sk::endian::le_to_host(v)
+                        : sk::endian::be_to_host(v);
+            }
+        }
+
         for (std::size_t f = 0; f < frames; ++f)
             for (std::size_t c = 0; c < ch; ++c)
                 dst(c, f) = inter[f * ch + c];
@@ -261,8 +335,11 @@ void sk::SineKit::readInterleaved(std::ifstream& in, AudioBuffer<T>& dst,
 }
 
 template<typename T>
-void sk::SineKit::writeInterleaved(std::ofstream& out, const AudioBuffer<T>& src,
-                               std::size_t frames, std::size_t ch)
+void sk::SineKit::writeInterleaved(std::ofstream& out,
+                                   const AudioBuffer<T>& src,
+                                   std::size_t frames,
+                                   std::size_t ch,
+                                   sk::endian::Endian fileEndian)
 {
     if constexpr (std::is_same_v<T, std::int32_t>) {
         // 24‑bit PCM: write 3 bytes per sample, little‑endian
@@ -270,9 +347,15 @@ void sk::SineKit::writeInterleaved(std::ofstream& out, const AudioBuffer<T>& src
         for (std::size_t f = 0; f < frames; ++f) {
             for (std::size_t cdx = 0; cdx < ch; ++cdx) {
                 auto s = static_cast<std::uint32_t>(src(cdx, f));
-                trip[0] =  s        & 0xFF;
-                trip[1] = (s >>  8) & 0xFF;
-                trip[2] = (s >> 16) & 0xFF;
+                if (fileEndian == sk::endian::Endian::Little) {
+                    trip[0] =  s        & 0xFF;
+                    trip[1] = (s >>  8) & 0xFF;
+                    trip[2] = (s >> 16) & 0xFF;
+                } else {
+                    trip[2] =  s        & 0xFF;
+                    trip[1] = (s >>  8) & 0xFF;
+                    trip[0] = (s >> 16) & 0xFF;
+                }
                 out.write(reinterpret_cast<char*>(trip.data()), 3);
             }
         }
@@ -281,6 +364,12 @@ void sk::SineKit::writeInterleaved(std::ofstream& out, const AudioBuffer<T>& src
         for (std::size_t f = 0; f < frames; ++f)
             for (std::size_t cdx = 0; cdx < ch; ++cdx)
                 inter[f * ch + cdx] = src(cdx, f);
+
+        for (auto& v : inter) {
+            if constexpr (sizeof(T) != 1) {
+                v = sk::endian::host_to_file(v, fileEndian);
+            }
+        }
 
         out.write(reinterpret_cast<const char*>(inter.data()),
                   static_cast<std::streamsize>(inter.size() * sizeof(T)));
@@ -292,21 +381,27 @@ void sk::SineKit::loadFile(const std::filesystem::path& input_path)
 {
     std::ifstream file(input_path, std::ios::binary);
     if(!file) throw std::runtime_error("open " + input_path.string());
+    if (input_path.extension() == ".wav") {
+        WAVHeader_.read(file);
 
-    WAVHeader_.read(file);
+        NumChannels_ = WAVHeader_.fmt.NumChannels;
+        SampleRate_    = static_cast<SampleRate>(WAVHeader_.fmt.SampleRate);
+        BitType_ = static_cast<BitType>(WAVHeader_.fmt.BitsPerSample);
+        NumFrames_ = WAVHeader_.data.Subchunk2Size / WAVHeader_.fmt.BlockAlign;
 
-    NumChannels_ = WAVHeader_.fmt.NumChannels;
-    SampleRate_    = static_cast<SampleRate>(WAVHeader_.fmt.SampleRate);
-    BitType_ = static_cast<BitType>(WAVHeader_.fmt.BitsPerSample);
-    NumFrames_ = WAVHeader_.data.Subchunk2Size / WAVHeader_.fmt.BlockAlign;
-
-    switch(BitType_){
-        case BitType::I16: readInterleaved(file, Buffer16_, NumFrames_, NumChannels_); break;
-        case BitType::I24: readInterleaved(file, Buffer24_, NumFrames_, NumChannels_); break;
-        case BitType::F32: readInterleaved(file, Buffer32f_, NumFrames_, NumChannels_); break;
-        case BitType::F64: readInterleaved(file, Buffer64f_, NumFrames_, NumChannels_); break;
-        default: throw std::runtime_error("unsupported depth");
+        switch(BitType_){
+            case BitType::I16: readInterleaved(file, Buffer16_, NumFrames_, NumChannels_, sk::endian::Endian::Little); break;
+            case BitType::I24: readInterleaved(file, Buffer24_, NumFrames_, NumChannels_, sk::endian::Endian::Little); break;
+            case BitType::F32: readInterleaved(file, Buffer32f_, NumFrames_, NumChannels_, sk::endian::Endian::Little); break;
+            case BitType::F64: readInterleaved(file, Buffer64f_, NumFrames_, NumChannels_, sk::endian::Endian::Little); break;
+            default: throw std::runtime_error("unsupported depth");
+        }
+        updateHeaders();
+    } else if (input_path.extension() == ".aiff") {
+        AIFFHeader_.read(file);
+        std::cout << AIFFHeader_ << std::endl;
     }
+
 }
 
 void sk::SineKit::writeFile(const std::filesystem::path& output_path) const
@@ -317,10 +412,10 @@ void sk::SineKit::writeFile(const std::filesystem::path& output_path) const
     WAVHeader_.write(file);
 
     switch(BitType_){
-        case BitType::I16: writeInterleaved(file, Buffer16_, NumFrames_, NumChannels_); break;
-        case BitType::I24: writeInterleaved(file, Buffer24_, NumFrames_, NumChannels_); break;
-        case BitType::F32: writeInterleaved(file, Buffer32f_, NumFrames_, NumChannels_); break;
-        case BitType::F64: writeInterleaved(file, Buffer64f_, NumFrames_, NumChannels_); break;
+        case BitType::I16: writeInterleaved(file, Buffer16_, NumFrames_, NumChannels_, sk::endian::Endian::Little); break;
+        case BitType::I24: writeInterleaved(file, Buffer24_, NumFrames_, NumChannels_, sk::endian::Endian::Little); break;
+        case BitType::F32: writeInterleaved(file, Buffer32f_, NumFrames_, NumChannels_, sk::endian::Endian::Little); break;
+        case BitType::F64: writeInterleaved(file, Buffer64f_, NumFrames_, NumChannels_, sk::endian::Endian::Little); break;
         default: assert(false);
     }
 }
