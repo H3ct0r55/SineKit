@@ -8,11 +8,15 @@
 #include <vector>
 #include <cassert>
 #include "EndianHelpers.h"
-#include "Extended80.h"
 #include <bit>
 #include <type_traits>
 #include <cstring>
 #include <string>
+#include <float.h>
+#include "lib/CustomFloat.h"
+#include <cstdint>
+#include "headers/WAVHeaders.h"
+
 
 namespace sk {
     struct Tag {char v[4];};
@@ -83,17 +87,28 @@ namespace sk {
         std::int16_t    NumChannels {0};
         std::uint32_t   NumSamples  {0};
         std::int16_t    BitDepth    {0};
-        sk::Extended80  SampleRate   {};
+        Float80         SampleRate  {0};
         void read(std::ifstream& file);
         void write(std::ofstream& file) const;
     };
     std::ostream& operator<<(std::ostream& os, const COMMHeader& input);
 
+    struct SSNDHeader {
+        Tag             ChunkID     {{'S','S','N','D'}};
+        std::uint32_t   ChunkSize   {0};
+        std::uint32_t   Offset      {0};
+        std::uint32_t   BlockSize   {0};
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
+    };
+
     struct AIFFHeader {
         FORMHeader      form;
         COMMHeader      comm;
+        SSNDHeader      ssnd;
         void read(std::ifstream& file);
         void write(std::ofstream& file) const;
+        void update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames);
     };
     std::ostream& operator<<(std::ostream& os, const AIFFHeader& input);
 

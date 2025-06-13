@@ -7,7 +7,6 @@
 #include <iostream>
 #include <iomanip>
 #include <ostream>
-#include "Extended80.h"
 
 namespace sk::endian {
 
@@ -114,32 +113,6 @@ template<IntWord T>
 {
     return (fileEndian == Endian::Little) ? host_to_le(v)
                                           : host_to_be(v);
-}
-
-    inline void write_be(std::ostream& os, const Extended80& v)
-{
-    // The raw array already stores the value in big‑endian order.
-    os.write(reinterpret_cast<const char*>(v.raw.data()),
-             static_cast<std::streamsize>(v.raw.size()));
-}
-
-    inline void read_be(std::istream& is, Extended80& v)
-{
-    // Read the ten raw bytes exactly as they appear on disk.
-    is.read(reinterpret_cast<char*>(v.raw.data()),
-            static_cast<std::streamsize>(v.raw.size()));
-
-    // ── Debug: dump raw bytes and bit pattern ───────────────────────────
-    std::cerr << "[Extended80] raw bytes (hex): ";
-    for (auto byte : v.raw)
-        std::cerr << std::hex << std::setw(2) << std::setfill('0')
-                  << static_cast<int>(byte) << ' ';
-    std::cerr << std::dec << '\n';
-
-    std::cerr << "[Extended80] bits: ";
-    for (auto byte : v.raw)
-        std::cerr << std::bitset<8>(byte) << ' ';
-    std::cerr << '\n';
 }
 
 } // namespace sk::endian
