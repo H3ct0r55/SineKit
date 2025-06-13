@@ -5,4 +5,8 @@
 #ifndef AIFFHEADERS_H
 #define AIFFHEADERS_H
 
+namespace sk::headers {
+
+}
+
 #endif //AIFFHEADERS_H

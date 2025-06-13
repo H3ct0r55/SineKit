@@ -10,4 +10,5 @@ add_library(SineKit STATIC src/SineKit.cpp
         src/headers/WAVHeaders.cpp
         src/headers/AIFFHeaders.h
         src/headers/AIFFHeaders.cpp
+        src/headers/HeaderTags.h
 )

@@ -7,7 +7,7 @@
 #include <iostream>
 #include <vector>
 #include <cassert>
-#include "EndianHelpers.h"
+#include "lib/EndianHelpers.h"
 #include <bit>
 #include <type_traits>
 #include <cstring>
@@ -17,73 +17,22 @@
 #include <cstdint>
 #include "headers/WAVHeaders.h"
 #include "headers/AIFFHeaders.h"
+#include "headers/HeaderTags.h"
 
 
 namespace sk {
-    struct Tag {char v[4];};
-    std::ostream& operator<<(std::ostream& os, const Tag& input);
-
-    struct RIFFHeader {
-        Tag             ChunkID         {{'R','I','F','F'}};
-        std::uint32_t   ChunkSize       {0};
-        Tag             Format          {{'W','A','V','E'}};
-
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-    };
-    std::ostream& operator<<(std::ostream& os, const RIFFHeader& input);
-
-    struct FMTHeader {
-        Tag             Subchunk1ID     {{'f','m','t',' '}};
-        std::uint32_t   Subchunk1Size   {16};
-        std::uint16_t   AudioFormat     {1};
-        std::uint16_t   NumChannels     {0};
-        std::uint32_t   SampleRate      {0};
-        std::uint32_t   ByteRate        {0};
-        std::uint16_t   BlockAlign      {0};
-        std::uint16_t   BitsPerSample   {0};
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-    };
-    std::ostream& operator<<(std::ostream& os, const FMTHeader& input);
-
-    struct FACTHeader {
-        Tag             ChunkID         {{'f','a','c','t'}};
-        std::uint32_t   ChunkSize       {4};
-        std::uint32_t   NumSamples       {0};
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-    };
-
-    struct WAVDataHeader {
-        Tag             Subchunk2ID     {{'d','a','t','a'}};
-        std::uint32_t   Subchunk2Size   {0};
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-    };
-    std::ostream& operator<<(std::ostream& os, const WAVDataHeader& input);
-
-    struct WAVHeader {
-        RIFFHeader      riff;
-        FMTHeader       fmt;
-        FACTHeader       fact;
-        WAVDataHeader   data;
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-        void update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat);
-    };
 
     struct FORMHeader {
-        Tag             ChunkID     {{'F','O','R','M'}};
+        headers::Tag             ChunkID     {{'F','O','R','M'}};
         std::uint32_t   ChunkSize   {0};
-        Tag             FormType    {{'A','I','F','F'}};
+        headers::Tag             FormType    {{'A','I','F','F'}};
         void read(std::ifstream& file);
         void write(std::ofstream& file) const;
     };
     std::ostream& operator<<(std::ostream& os, const FORMHeader& input);
 
     struct COMMHeader {
-        Tag             ChunkID     {{'C','O','M','M'}};
+        headers::Tag             ChunkID     {{'C','O','M','M'}};
         std::int32_t    ChunkSize   {0};
         std::int16_t    NumChannels {0};
         std::uint32_t   NumSamples  {0};
@@ -95,7 +44,7 @@ namespace sk {
     std::ostream& operator<<(std::ostream& os, const COMMHeader& input);
 
     struct SSNDHeader {
-        Tag             ChunkID     {{'S','S','N','D'}};
+        headers::Tag             ChunkID     {{'S','S','N','D'}};
         std::uint32_t   ChunkSize   {0};
         std::uint32_t   Offset      {0};
         std::uint32_t   BlockSize   {0};
@@ -149,7 +98,7 @@ namespace sk {
 
     class SineKit {
     private:
-        WAVHeader               WAVHeader_;
+        headers::WAVHeader               WAVHeader_;
         AIFFHeader              AIFFHeader_;
         AudioType               AudioType_      {AudioType::Undefined};
         BitType                 BitType_        {BitType::Undefined};
