@@ -22,46 +22,6 @@
 
 namespace sk {
 
-    struct FORMHeader {
-        headers::Tag             ChunkID     {{'F','O','R','M'}};
-        std::uint32_t   ChunkSize   {0};
-        headers::Tag             FormType    {{'A','I','F','F'}};
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-    };
-    std::ostream& operator<<(std::ostream& os, const FORMHeader& input);
-
-    struct COMMHeader {
-        headers::Tag             ChunkID     {{'C','O','M','M'}};
-        std::int32_t    ChunkSize   {0};
-        std::int16_t    NumChannels {0};
-        std::uint32_t   NumSamples  {0};
-        std::int16_t    BitDepth    {0};
-        Float80         SampleRate  {0};
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-    };
-    std::ostream& operator<<(std::ostream& os, const COMMHeader& input);
-
-    struct SSNDHeader {
-        headers::Tag             ChunkID     {{'S','S','N','D'}};
-        std::uint32_t   ChunkSize   {0};
-        std::uint32_t   Offset      {0};
-        std::uint32_t   BlockSize   {0};
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-    };
-
-    struct AIFFHeader {
-        FORMHeader      form;
-        COMMHeader      comm;
-        SSNDHeader      ssnd;
-        void read(std::ifstream& file);
-        void write(std::ofstream& file) const;
-        void update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames);
-    };
-    std::ostream& operator<<(std::ostream& os, const AIFFHeader& input);
-
     enum class AudioType {Undefined, PCM, DSD};
 
     enum class BitType : std::uint16_t { Undefined = 0, I16 = 16, I24 = 24, F32 = 32, F64 = 64 };
@@ -99,7 +59,7 @@ namespace sk {
     class SineKit {
     private:
         headers::WAVHeader               WAVHeader_;
-        AIFFHeader              AIFFHeader_;
+        headers::AIFFHeader              AIFFHeader_;
         AudioType               AudioType_      {AudioType::Undefined};
         BitType                 BitType_        {BitType::Undefined};
         SampleRate              SampleRate_     {SampleRate::Undefined};

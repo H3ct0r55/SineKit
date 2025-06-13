@@ -77,10 +77,10 @@ int verifyWAVChunk(std::ifstream& file) {
     file.read(readData, sizeof(readData));
     if (!file) return false;
     file.seekg(-4, std::ios::cur);
-    if (std::memcmp(readData, "RIFF", 4) == 0) return 1;
-    if (std::memcmp(readData, "fmt ", 4) == 0) return 2;
-    if (std::memcmp(readData, "fact", 4) == 0) return 3;
-    if (std::memcmp(readData, "data", 4) == 0) return 4;
+    if (std::strncmp(readData, "RIFF", 4) == 0) return 1;
+    if (std::strncmp(readData, "fmt ", 4) == 0) return 2;
+    if (std::strncmp(readData, "fact", 4) == 0) return 3;
+    if (std::strncmp(readData, "data", 4) == 0) return 4;
     return 0;
 }
 // ─── WAV HEADER helpers ───────────────────────────────────────────────────
