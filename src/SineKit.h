@@ -16,6 +16,7 @@
 #include "lib/CustomFloat.h"
 #include <cstdint>
 #include "headers/WAVHeaders.h"
+#include "headers/AIFFHeaders.h"
 
 
 namespace sk {
