@@ -1,11 +1,12 @@
 # SineKit
 
 [![status – pre‑alpha](https://img.shields.io/badge/status-pre--alpha-yellow)](https://shields.io)
-[![language – C++20](https://img.shields.io/badge/language-C%2B%2B20-blue)](https://isocpp.org)
+[![language – C++23](https://img.shields.io/badge/language-C%2B%2B20-blue)](https://isocpp.org)
 [![license – PolyForm NC 1.0.0](https://img.shields.io/badge/license-PolyForm%20NC%201.0.0-lightgrey)](#-license)
 
-> **SineKit** is an **open‑source, cross‑platform, cross‑format** audio‑conversion **library** written in **C++20**.  
+> **SineKit** is an **open‑source, cross‑platform, cross‑format** audio‑conversion **library** written in **C++23**.  
 > It targets *bit‑perfect* conversion between PCM and DSD and will later power both a GUI converter and a licensable SDK.
+> Will eventually be moved over to C++20 and possibly C++17
 
 ---
 
