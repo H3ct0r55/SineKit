@@ -8,7 +8,7 @@
 #include "HeaderTags.h"
 #include "../lib/CustomFloat.h"
 
-namespace sk::headers {
+namespace sk::headers::AIFF {
     struct FORMHeader {
         headers::Tag             ChunkID     {{'F','O','R','M'}};
         std::uint32_t   ChunkSize   {0};

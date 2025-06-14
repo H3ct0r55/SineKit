@@ -5,18 +5,18 @@
 #include "AIFFHeaders.h"
 #include "../lib/EndianHelpers.h"
 
-void sk::headers::FORMHeader::read(std::ifstream& file) {
+void sk::headers::AIFF::FORMHeader::read(std::ifstream& file) {
     file.read(ChunkID.v, sizeof(ChunkID.v));
     ChunkSize = sk::endian::read_be<decltype(ChunkSize)>(file);
     file.read(FormType.v, sizeof(FormType.v));
 }
 
-void sk::headers::FORMHeader::write(std::ofstream& file) const {
+void sk::headers::AIFF::FORMHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_be<decltype(ChunkSize)>(file, ChunkSize);
     file.write(FormType.v, sizeof(FormType.v));
 }
-std::ostream& sk::headers::operator<<(std::ostream& os, const sk::headers::FORMHeader& input) {
+std::ostream& sk::headers::AIFF::operator<<(std::ostream& os, const sk::headers::AIFF::FORMHeader& input) {
     os << "FORM Header" << std::endl;
     os << "Chunk ID: " << input.ChunkID << std::endl;
     os << "Chunk Size: " << input.ChunkSize << std::endl;
@@ -24,7 +24,7 @@ std::ostream& sk::headers::operator<<(std::ostream& os, const sk::headers::FORMH
     return os;
 }
 
-void sk::headers::COMMHeader::read(std::ifstream& file) {
+void sk::headers::AIFF::COMMHeader::read(std::ifstream& file) {
     file.read(ChunkID.v, sizeof(ChunkID.v));
     ChunkSize = sk::endian::read_be<decltype(ChunkSize)>(file);
     NumChannels = sk::endian::read_be<decltype(NumChannels)>(file);
@@ -33,7 +33,7 @@ void sk::headers::COMMHeader::read(std::ifstream& file) {
     file.read(reinterpret_cast<char*>(&SampleRate), sizeof(SampleRate));
 }
 
-void sk::headers::COMMHeader::write(std::ofstream& file) const {
+void sk::headers::AIFF::COMMHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_be<decltype(ChunkSize)>(file, ChunkSize);
     sk::endian::write_be<decltype(NumChannels)>(file, NumChannels);
@@ -41,7 +41,7 @@ void sk::headers::COMMHeader::write(std::ofstream& file) const {
     sk::endian::write_be<decltype(BitDepth)>(file, BitDepth);
     file.write(reinterpret_cast<const char*>(&SampleRate), sizeof(SampleRate));
 }
-std::ostream &sk::headers::operator<<(std::ostream &os, const headers::COMMHeader &input) {
+std::ostream &sk::headers::AIFF::operator<<(std::ostream &os, const headers::AIFF::COMMHeader &input) {
     os << "COMM Header" << std::endl;
     os << "Chunk ID: " << input.ChunkID << std::endl;
     os << "Chunk Size: " << input.ChunkSize << std::endl;
@@ -52,28 +52,28 @@ std::ostream &sk::headers::operator<<(std::ostream &os, const headers::COMMHeade
     return os;
 }
 
-void sk::headers::SSNDHeader::read(std::ifstream& file) {
+void sk::headers::AIFF::SSNDHeader::read(std::ifstream& file) {
     file.read(ChunkID.v, sizeof(ChunkID.v));
     ChunkSize = sk::endian::read_be<decltype(ChunkSize)>(file);
     Offset = sk::endian::read_be<decltype(Offset)>(file);
     BlockSize = sk::endian::read_be<decltype(BlockSize)>(file);
 }
 
-void sk::headers::COMMHeader::readComp(std::ifstream &file) {
+void sk::headers::AIFF::COMMHeader::readComp(std::ifstream &file) {
     file.read(CompType.v, sizeof(CompType.v));
     CompName.Size = sk::endian::read_be<decltype(CompName.Size)>(file);
     file.read(CompType.v, sizeof(CompType.v));
 }
 
 
-void sk::headers::SSNDHeader::write(std::ofstream& file) const {
+void sk::headers::AIFF::SSNDHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_be<decltype(ChunkSize)>(file, ChunkSize);
     sk::endian::write_be<decltype(Offset)>(file, Offset);
     sk::endian::write_be<decltype(BlockSize)>(file, BlockSize);
 }
 
-void sk::headers::COMMHeader::writeComp(std::ofstream &file) const {
+void sk::headers::AIFF::COMMHeader::writeComp(std::ofstream &file) const {
     file.write(CompType.v, sizeof(CompType.v));
     sk::endian::write_be<decltype(CompName.Size)>(file, CompName.Size);
     file.write(CompName.v, sizeof(CompName.v));
@@ -92,7 +92,7 @@ int verifyAIFFChunk(std::ifstream& file) {
     return 0;
 }
 
-void sk::headers::AIFFHeader::read(std::ifstream& file) {
+void sk::headers::AIFF::AIFFHeader::read(std::ifstream& file) {
     bool foundFORM = false;
     bool foundCOMM = false;
     bool foundSSND = false;
@@ -136,14 +136,14 @@ void sk::headers::AIFFHeader::read(std::ifstream& file) {
     }
 }
 
-std::ostream& sk::headers::operator<<(std::ostream& os, const sk::headers::AIFFHeader& aiff) {
+std::ostream& sk::headers::AIFF::operator<<(std::ostream& os, const sk::headers::AIFF::AIFFHeader& aiff) {
     os << "AIFF Header" << std::endl;
     os << aiff.form;
     os << aiff.comm;
     return os;
 }
 
-void sk::headers::AIFFHeader::write(std::ofstream& file) const {
+void sk::headers::AIFF::AIFFHeader::write(std::ofstream& file) const {
     form.write(file);
     comm.write(file);
     if (std::strncmp(form.FormType.v, "AIFC", 4) == 0) {
@@ -152,7 +152,7 @@ void sk::headers::AIFFHeader::write(std::ofstream& file) const {
     ssnd.write(file);
 }
 
-void sk::headers::AIFFHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat) {
+void sk::headers::AIFF::AIFFHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat) {
     // ─── COMM chunk ───────────────────────────────────────────────
     comm.BitDepth    = static_cast<std::int16_t>(bitDepth);
     comm.SampleRate  = static_cast<Float80>(sampleRate);      // already 10 bytes (static‑asserted elsewhere)

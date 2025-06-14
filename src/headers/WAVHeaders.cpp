@@ -5,14 +5,14 @@
 #include "WAVHeaders.h"
 
 // ─── RIFF helpers ─────────────────────────────────────────────────────────
-void sk::headers::RIFFHeader::read(std::ifstream& file) {
+void sk::headers::WAV::RIFFHeader::read(std::ifstream& file) {
     file.read(ChunkID.v, sizeof(ChunkID.v));
     ChunkSize = sk::endian::read_le<decltype(ChunkSize)>(file);
     file.read(Format.v, sizeof(Format.v));
     if(!file) throw std::runtime_error("RIFF header read failed");
 }
 
-void sk::headers::RIFFHeader::write(std::ofstream& file) const {
+void sk::headers::WAV::RIFFHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_le<decltype(ChunkSize)>(file, ChunkSize);
     file.write(Format.v, sizeof(Format.v));
@@ -20,7 +20,7 @@ void sk::headers::RIFFHeader::write(std::ofstream& file) const {
 
 
 // ─── FMT helpers ──────────────────────────────────────────────────────────
-void sk::headers::FMTHeader::read(std::ifstream& file) {
+void sk::headers::WAV::FMTHeader::read(std::ifstream& file) {
     file.read(Subchunk1ID.v, sizeof(Subchunk1ID.v));
 
     Subchunk1Size = sk::endian::read_le<decltype(Subchunk1Size)>(file);
@@ -34,7 +34,7 @@ void sk::headers::FMTHeader::read(std::ifstream& file) {
     if (!file) throw std::runtime_error("FMTHeader header read failed");
 }
 
-void sk::headers::FMTHeader::write(std::ofstream& file) const {
+void sk::headers::WAV::FMTHeader::write(std::ofstream& file) const {
     file.write(Subchunk1ID.v, sizeof(Subchunk1ID.v));
     sk::endian::write_le<decltype(Subchunk1Size)>(file, Subchunk1Size);
     sk::endian::write_le<decltype(AudioFormat)>(file, AudioFormat);
@@ -46,14 +46,14 @@ void sk::headers::FMTHeader::write(std::ofstream& file) const {
 }
 
 
-void sk::headers::FACTHeader::read(std::ifstream& file) {
+void sk::headers::WAV::FACTHeader::read(std::ifstream& file) {
     file.read(ChunkID.v, sizeof(ChunkID.v));
     ChunkSize = sk::endian::read_le<decltype(ChunkSize)>(file);
     NumSamples = sk::endian::read_le<decltype(NumSamples)>(file);
     if (!file) throw std::runtime_error("FACTHeader header read failed");
 }
 
-void sk::headers::FACTHeader::write(std::ofstream& file) const {
+void sk::headers::WAV::FACTHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_le<decltype(ChunkSize)>(file, ChunkSize);
     sk::endian::write_le<decltype(NumSamples)>(file, NumSamples);
@@ -61,13 +61,13 @@ void sk::headers::FACTHeader::write(std::ofstream& file) const {
 
 
 // ─── WAV DATA helpers ─────────────────────────────────────────────────────
-void sk::headers::WAVDataHeader::read(std::ifstream& file) {
+void sk::headers::WAV::WAVDataHeader::read(std::ifstream& file) {
     file.read(Subchunk2ID.v, sizeof(Subchunk2ID.v));
     Subchunk2Size = sk::endian::read_le<decltype(Subchunk2Size)>(file);
     if (!file) throw std::runtime_error("WAV DATA header read failed");
 }
 
-void sk::headers::WAVDataHeader::write(std::ofstream& file) const {
+void sk::headers::WAV::WAVDataHeader::write(std::ofstream& file) const {
     file.write(Subchunk2ID.v, sizeof(Subchunk2ID.v));
     sk::endian::write_le<decltype(Subchunk2Size)>(file, Subchunk2Size);
 }
@@ -84,7 +84,7 @@ int verifyWAVChunk(std::ifstream& file) {
     return 0;
 }
 // ─── WAV HEADER helpers ───────────────────────────────────────────────────
-void sk::headers::WAVHeader::read(std::ifstream& file) {
+void sk::headers::WAV::WAVHeader::read(std::ifstream& file) {
     bool foundRIFF = false;
     bool foundFMT = false;
     bool foundFact = false;
@@ -136,7 +136,7 @@ void sk::headers::WAVHeader::read(std::ifstream& file) {
 }
 
 
-void sk::headers::WAVHeader::write(std::ofstream& file) const {
+void sk::headers::WAV::WAVHeader::write(std::ofstream& file) const {
     riff.write(file);
     fmt.write(file);
     if (fmt.AudioFormat == 3) {
@@ -145,7 +145,7 @@ void sk::headers::WAVHeader::write(std::ofstream& file) const {
     data.write(file);
 }
 
-void sk::headers::WAVHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat) {
+void sk::headers::WAV::WAVHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat) {
     fmt.AudioFormat = isFloat ? 3 : 1;
     fmt.NumChannels = numChannels;
     fmt.SampleRate = sampleRate;

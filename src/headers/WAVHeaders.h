@@ -10,7 +10,7 @@
 #include <iostream>
 #include <fstream>
 
-namespace sk::headers {
+namespace sk::headers::WAV {
     struct RIFFHeader {
         Tag             ChunkID         {{'R','I','F','F'}};
         std::uint32_t   ChunkSize       {0};
