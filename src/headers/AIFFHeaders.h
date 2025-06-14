@@ -26,7 +26,7 @@ namespace sk::headers::AIFF {
         std::int16_t    BitDepth    {0};
         Float80         SampleRate  {0};
         headers::Tag    CompType {{'f','l','3','2'}};
-        headers::PascalString   CompName {{12}, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
+        headers::PascalString   CompName {12, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
         void read(std::ifstream& file);
         void readComp(std::ifstream& file);
         void write(std::ofstream& file) const;

@@ -5,6 +5,7 @@
 #include "AIFFHeaders.h"
 #include "../lib/EndianHelpers.h"
 
+
 void sk::headers::AIFF::FORMHeader::read(std::ifstream& file) {
     file.read(ChunkID.v, sizeof(ChunkID.v));
     ChunkSize = sk::endian::read_be<decltype(ChunkSize)>(file);
@@ -186,12 +187,12 @@ void sk::headers::AIFF::AIFFHeader::update(std::uint16_t bitDepth, std::uint32_t
         switch (bitDepth) {
             case 32: {
                 comm.CompType = {{'f','l','3','2'}};
-                comm.CompName = {{12}, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
+                comm.CompName = {12, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
                 break;
             }
             case 64: {
                 comm.CompType = {{'f','l','6','4'}};
-                comm.CompName = {{12}, {'F','l','o','a','t',' ','6','4','-','b','i','t',0x00}};
+                comm.CompName = {12, {'F','l','o','a','t',' ','6','4','-','b','i','t',0x00}};
                 break;
             }
             default: break;
