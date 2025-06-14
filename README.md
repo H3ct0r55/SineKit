@@ -77,3 +77,4 @@ Commercial use requires a separate agreement with **Sine Industry**.
 
 > _SineKit is in rapid development; expect sharp edges and breaking changes!_  
 > Thank you for trying it out.
+> The code is currrently written in C++23 to help rapidly move through the beginning of the project, once the project matures, it will eventually be moved back to C++20 and even potentially C++17 depending on demands and the current support of C++20
