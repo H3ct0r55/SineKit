@@ -15,6 +15,11 @@ namespace sk::headers {
         }
         return os;
     }
+
+    struct PascalString {
+        uint8_t Size;
+        char v[13];
+    };
 }
 
 #endif //HEADERTAGS_H

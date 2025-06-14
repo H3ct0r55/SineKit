@@ -59,12 +59,26 @@ void sk::headers::SSNDHeader::read(std::ifstream& file) {
     BlockSize = sk::endian::read_be<decltype(BlockSize)>(file);
 }
 
+void sk::headers::COMMHeader::readComp(std::ifstream &file) {
+    file.read(CompType.v, sizeof(CompType.v));
+    CompName.Size = sk::endian::read_be<decltype(CompName.Size)>(file);
+    file.read(CompType.v, sizeof(CompType.v));
+}
+
+
 void sk::headers::SSNDHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_be<decltype(ChunkSize)>(file, ChunkSize);
     sk::endian::write_be<decltype(Offset)>(file, Offset);
     sk::endian::write_be<decltype(BlockSize)>(file, BlockSize);
 }
+
+void sk::headers::COMMHeader::writeComp(std::ofstream &file) const {
+    file.write(CompType.v, sizeof(CompType.v));
+    sk::endian::write_be<decltype(CompName.Size)>(file, CompName.Size);
+    file.write(CompName.v, sizeof(CompName.v));
+}
+
 
 
 int verifyAIFFChunk(std::ifstream& file) {
@@ -82,12 +96,16 @@ void sk::headers::AIFFHeader::read(std::ifstream& file) {
     bool foundFORM = false;
     bool foundCOMM = false;
     bool foundSSND = false;
+    bool readAIFC = false;
     while (!foundFORM || !foundCOMM || !foundSSND) {
         switch (verifyAIFFChunk(file)) {
             case 1 : {
                 if (!foundFORM) {
                     foundFORM = true;
                     form.read(file);
+                    if (std::strncmp(form.FormType.v, "AIFC", 4) == 0) {
+                        readAIFC = true;
+                    }
                     break;
                 }
                 throw std::runtime_error("Multiple FORM headers found, invalid file");
@@ -96,6 +114,9 @@ void sk::headers::AIFFHeader::read(std::ifstream& file) {
                 if (!foundCOMM) {
                     foundCOMM = true;
                     comm.read(file);
+                    if (readAIFC) {
+                        comm.readComp(file);
+                    }
                     break;
                 }
                 throw std::runtime_error("Multiple COMM headers found, invalid file");
@@ -109,7 +130,7 @@ void sk::headers::AIFFHeader::read(std::ifstream& file) {
                 throw std::runtime_error("Multiple SSND headers found, invalid file");
             }
             default: {
-                file.seekg(2, std::ios::cur);
+                file.seekg(1, std::ios::cur);
             }
         }
     }
@@ -125,10 +146,13 @@ std::ostream& sk::headers::operator<<(std::ostream& os, const sk::headers::AIFFH
 void sk::headers::AIFFHeader::write(std::ofstream& file) const {
     form.write(file);
     comm.write(file);
+    if (std::strncmp(form.FormType.v, "AIFC", 4) == 0) {
+        comm.writeComp(file);
+    }
     ssnd.write(file);
 }
 
-void sk::headers::AIFFHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames) {
+void sk::headers::AIFFHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat) {
     // ─── COMM chunk ───────────────────────────────────────────────
     comm.BitDepth    = static_cast<std::int16_t>(bitDepth);
     comm.SampleRate  = static_cast<Float80>(sampleRate);      // already 10 bytes (static‑asserted elsewhere)
@@ -136,7 +160,11 @@ void sk::headers::AIFFHeader::update(std::uint16_t bitDepth, std::uint32_t sampl
     comm.NumSamples  = numFrames;
 
     // Uncompressed PCM ⇒ COMM payload is fixed at 18 bytes.
-    comm.ChunkSize = 18;
+    if (isFloat) {
+        comm.ChunkSize = 36;
+    } else {
+        comm.ChunkSize = 18;
+    }
     comm.ChunkID   = {{'C','O','M','M'}};
 
     // ─── FORM chunk ───────────────────────────────────────────────
@@ -153,7 +181,24 @@ void sk::headers::AIFFHeader::update(std::uint16_t bitDepth, std::uint32_t sampl
         (8 + ssndPayloadSize);
 
     form.ChunkID  = {{'F','O','R','M'}};
-    form.FormType = {{'A','I','F','F'}};
+    if (isFloat) {
+        form.FormType = {{'A','I','F','C'}};
+        switch (bitDepth) {
+            case 32: {
+                comm.CompType = {{'f','l','3','2'}};
+                comm.CompName = {{12}, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
+                break;
+            }
+            case 64: {
+                comm.CompType = {{'f','l','6','4'}};
+                comm.CompName = {{12}, {'F','l','o','a','t',' ','6','4','-','b','i','t',0x00}};
+                break;
+            }
+            default: break;
+        }
+    } else {
+        form.FormType = {{'A','I','F','F'}};
+    }
     form.ChunkSize = static_cast<std::uint32_t>(formSize);
 
     ssnd.ChunkID  = {{'S','S','N','D'}};

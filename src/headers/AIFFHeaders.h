@@ -25,8 +25,12 @@ namespace sk::headers {
         std::uint32_t   NumSamples  {0};
         std::int16_t    BitDepth    {0};
         Float80         SampleRate  {0};
+        headers::Tag    CompType {{'f','l','3','2'}};
+        headers::PascalString   CompName {{12}, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
         void read(std::ifstream& file);
+        void readComp(std::ifstream& file);
         void write(std::ofstream& file) const;
+        void writeComp(std::ofstream& file) const;
     };
     std::ostream& operator<<(std::ostream& os, const COMMHeader& input);
 
@@ -45,7 +49,7 @@ namespace sk::headers {
         SSNDHeader      ssnd;
         void read(std::ifstream& file);
         void write(std::ofstream& file) const;
-        void update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames);
+        void update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat);
     };
     std::ostream& operator<<(std::ostream& os, const AIFFHeader& input);
 }
