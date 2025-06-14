@@ -58,8 +58,8 @@ namespace sk {
 
     class SineKit {
     private:
-        headers::WAVHeader               WAVHeader_;
-        headers::AIFFHeader              AIFFHeader_;
+        headers::WAV::WAVHeader               WAVHeader_;
+        headers::AIFF::AIFFHeader              AIFFHeader_;
         AudioType               AudioType_      {AudioType::Undefined};
         BitType                 BitType_        {BitType::Undefined};
         SampleRate              SampleRate_     {SampleRate::Undefined};
