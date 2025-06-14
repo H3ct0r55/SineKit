@@ -6,7 +6,6 @@
 
 > **SineKit** is an **open‑source, cross‑platform, cross‑format** audio‑conversion **library** written in **C++23**.  
 > It targets *bit‑perfect* conversion between PCM and DSD and will later power both a GUI converter and a licensable SDK.
-> Will eventually be moved over to C++20 and possibly C++17
 
 ---
 
