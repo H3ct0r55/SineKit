@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 
 add_library(SineKit STATIC src/SineKit.cpp
         src/SineKit.h
-        src/EndianHelpers.h
+        src/lib/EndianHelpers.h
         src/headers/WAVHeaders.h
         src/headers/WAVHeaders.cpp
         src/headers/AIFFHeaders.h
