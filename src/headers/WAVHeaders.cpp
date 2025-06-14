@@ -95,7 +95,6 @@ void sk::headers::WAVHeader::read(std::ifstream& file) {
                 if (!foundRIFF) {
                     foundRIFF = true;
                     riff.read(file);
-                    std::cout << "Found RIFF header" << std::endl;
                     break;
                 }
                 throw std::runtime_error("Multiple RIFF headers found, invalid file");
@@ -104,7 +103,6 @@ void sk::headers::WAVHeader::read(std::ifstream& file) {
                 if (!foundFMT) {
                     foundFMT = true;
                     fmt.read(file);
-                    std::cout << "Found FMT header" << std::endl;
                     break;
                 }
                 throw std::runtime_error("Multiple FMT headers found, invalid file");
@@ -113,7 +111,6 @@ void sk::headers::WAVHeader::read(std::ifstream& file) {
                 if (!foundFact) {
                     foundFact = true;
                     fact.read(file);
-                    std::cout << "Found Fact header" << std::endl;
                     break;
                 }
                 throw std::runtime_error("Multiple FACT headers found, invalid file");
@@ -122,7 +119,6 @@ void sk::headers::WAVHeader::read(std::ifstream& file) {
                 if (!foundData) {
                     foundData = true;
                     data.read(file);
-                    std::cout << "Found data header" << std::endl;
                     break;
                 }
                 throw std::runtime_error("Multiple DATA headers found, invalid file");
@@ -135,7 +131,6 @@ void sk::headers::WAVHeader::read(std::ifstream& file) {
 
         if (foundRIFF && foundFMT && foundData && fmt.AudioFormat != 3) {
             foundFact = true;
-            std::cout << "Skipping Fact Header" << std::endl;
         }
     }
 }
@@ -152,7 +147,6 @@ void sk::headers::WAVHeader::write(std::ofstream& file) const {
 
 void sk::headers::WAVHeader::update(std::uint16_t bitDepth, std::uint32_t sampleRate, std::uint16_t numChannels, std::uint32_t numFrames, bool isFloat) {
     fmt.AudioFormat = isFloat ? 3 : 1;
-    std::cout << fmt.AudioFormat << std::endl;
     fmt.NumChannels = numChannels;
     fmt.SampleRate = sampleRate;
     fmt.BlockAlign = numChannels * bitDepth / 8;

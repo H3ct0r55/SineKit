@@ -124,7 +124,6 @@ void sk::SineKit::loadFile(const std::filesystem::path& input_path)
         updateHeaders();
     } else if (input_path.extension() == ".aiff") {
         AIFFHeader_.read(file);
-        std::cout << AIFFHeader_ << std::endl;
 
         NumChannels_ = AIFFHeader_.comm.NumChannels;
         SampleRate_ = static_cast<SampleRate>(static_cast<std::uint32_t>(AIFFHeader_.comm.SampleRate));
@@ -170,4 +169,204 @@ void sk::SineKit::writeFile(const std::filesystem::path& output_path) const
         }
     }
     file.close();
+}
+
+void sk::SineKit::toBitDepth(BitType bitType) {
+    if (bitType == BitType_) return;
+    switch (bitType) {
+        case BitType::I16: {
+            switch (BitType_) {
+                case BitType::I16:
+                    break;
+                case BitType::I24: {
+                    Buffer16_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            Buffer16_.channels.at(j).at(i) = static_cast<int16_t>(Buffer24_.channels.at(j).at(i) >> 8);
+                        }
+                    }
+                    Buffer24_.channels.clear();
+                    BitType_ = BitType::I16;
+                    updateHeaders();
+                    break;
+                }
+                case BitType::F32: {
+                    Buffer16_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            float sample = Buffer32f_.channels.at(j).at(i);
+                            if (sample > 1.0f) sample = 1.0f;
+                            if (sample < -1.0f) sample = -1.0f;
+                            Buffer16_.channels.at(j).at(i) = static_cast<int16_t>(sample * 32767.0f);
+                        }
+                    }
+                    Buffer32f_.channels.clear();
+                    BitType_ = BitType::I16;
+                    updateHeaders();
+                    break;
+                }
+                case BitType::F64: {
+                    Buffer16_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            double sample = Buffer64f_.channels.at(j).at(i);
+                            if (sample > 1.0) sample = 1.0;
+                            if (sample < -1.0) sample = -1.0;
+                            Buffer16_.channels.at(j).at(i) = static_cast<int16_t>(sample * 32767.0);
+                        }
+                    }
+                    Buffer64f_.channels.clear();
+                    BitType_ = BitType::I16;
+                    updateHeaders();
+                    break;
+                }
+                default:
+                    throw std::runtime_error("unsupported bit depth conversion");
+            }
+            break;
+        }
+        case BitType::I24: {
+            switch (BitType_) {
+                case BitType::I24:
+                    break;
+                case BitType::I16: {
+                    Buffer24_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            Buffer24_.channels.at(j).at(i) = static_cast<int32_t>(Buffer16_.channels.at(j).at(i)) << 8;
+                        }
+                    }
+                    Buffer16_.channels.clear();
+                    BitType_ = BitType::I24;
+                    updateHeaders();
+                    break;
+                }
+                case BitType::F32: {
+                    Buffer24_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            float sample = Buffer32f_.channels.at(j).at(i);
+                            if (sample > 1.0f) sample = 1.0f;
+                            if (sample < -1.0f) sample = -1.0f;
+                            Buffer24_.channels.at(j).at(i) = static_cast<int32_t>(sample * 8388607.0f);
+                        }
+                    }
+                    Buffer32f_.channels.clear();
+                    BitType_ = BitType::I24;
+                    updateHeaders();
+                    break;
+                }
+                case BitType::F64: {
+                    Buffer24_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            double sample = Buffer64f_.channels.at(j).at(i);
+                            if (sample > 1.0) sample = 1.0;
+                            if (sample < -1.0) sample = -1.0;
+                            Buffer24_.channels.at(j).at(i) = static_cast<int32_t>(sample * 8388607.0);
+                        }
+                    }
+                    Buffer64f_.channels.clear();
+                    BitType_ = BitType::I24;
+                    updateHeaders();
+                    break;
+                }
+                default:
+                    throw std::runtime_error("unsupported bit depth conversion");
+            }
+            break;
+        }
+        case BitType::F32: {
+            switch (BitType_) {
+                case BitType::F32:
+                    break;
+                case BitType::I16: {
+                    Buffer32f_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            Buffer32f_.channels.at(j).at(i) = static_cast<float>(Buffer16_.channels.at(j).at(i)) / 32767.0f;
+                        }
+                    }
+                    Buffer16_.channels.clear();
+                    BitType_ = BitType::F32;
+                    updateHeaders();
+                    break;
+                }
+                case BitType::I24: {
+                    Buffer32f_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            Buffer32f_.channels.at(j).at(i) = static_cast<float>(Buffer24_.channels.at(j).at(i)) / 8388607.0f;
+                        }
+                    }
+                    Buffer24_.channels.clear();
+                    BitType_ = BitType::F32;
+                    updateHeaders();
+                    break;
+                }
+                case BitType::F64: {
+                    Buffer32f_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            Buffer32f_.channels.at(j).at(i) = static_cast<float>(Buffer64f_.channels.at(j).at(i));
+                        }
+                    }
+                    Buffer64f_.channels.clear();
+                    BitType_ = BitType::F32;
+                    updateHeaders();
+                    break;
+                }
+                default:
+                    throw std::runtime_error("unsupported bit depth conversion");
+            }
+            break;
+        }
+        case BitType::F64: {
+            switch (BitType_) {
+                case BitType::F64:
+                    break;
+                case BitType::I16: {
+                    Buffer64f_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            Buffer64f_.channels.at(j).at(i) = static_cast<double>(Buffer16_.channels.at(j).at(i)) / 32767.0;
+                        }
+                    }
+                    Buffer16_.channels.clear();
+                    BitType_ = BitType::F64;
+                    updateHeaders();
+                    break;
+                }
+                case BitType::I24: {
+                    Buffer64f_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            Buffer64f_.channels.at(j).at(i) = static_cast<double>(Buffer24_.channels.at(j).at(i)) / 8388607.0;
+                        }
+                    }
+                    Buffer24_.channels.clear();
+                    BitType_ = BitType::F64;
+                    updateHeaders();
+                    break;
+                }
+                case BitType::F32: {
+                    Buffer64f_.resize(NumChannels_, NumFrames_);
+                    for (int i = 0; i < NumFrames_; i++) {
+                        for (int j = 0; j < NumChannels_; j++) {
+                            Buffer64f_.channels.at(j).at(i) = static_cast<double>(Buffer32f_.channels.at(j).at(i));
+                        }
+                    }
+                    Buffer32f_.channels.clear();
+                    BitType_ = BitType::F64;
+                    updateHeaders();
+                    break;
+                }
+                default:
+                    throw std::runtime_error("unsupported bit depth conversion");
+            }
+            break;
+        }
+        default:
+            throw std::runtime_error("unsupported bit depth conversion");
+    }
 }

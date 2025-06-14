@@ -36,7 +36,6 @@ void sk::headers::COMMHeader::read(std::ifstream& file) {
 void sk::headers::COMMHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_be<decltype(ChunkSize)>(file, ChunkSize);
-    std::cout << ChunkSize << std::endl;
     sk::endian::write_be<decltype(NumChannels)>(file, NumChannels);
     sk::endian::write_be<decltype(NumSamples)>(file, NumSamples);
     sk::endian::write_be<decltype(BitDepth)>(file, BitDepth);
@@ -63,7 +62,6 @@ void sk::headers::SSNDHeader::read(std::ifstream& file) {
 void sk::headers::SSNDHeader::write(std::ofstream& file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_be<decltype(ChunkSize)>(file, ChunkSize);
-    std::cout << ChunkSize << std::endl;
     sk::endian::write_be<decltype(Offset)>(file, Offset);
     sk::endian::write_be<decltype(BlockSize)>(file, BlockSize);
 }
@@ -90,7 +88,6 @@ void sk::headers::AIFFHeader::read(std::ifstream& file) {
                 if (!foundFORM) {
                     foundFORM = true;
                     form.read(file);
-                    std::cout << "Found FORM header" << std::endl;
                     break;
                 }
                 throw std::runtime_error("Multiple FORM headers found, invalid file");
@@ -99,7 +96,6 @@ void sk::headers::AIFFHeader::read(std::ifstream& file) {
                 if (!foundCOMM) {
                     foundCOMM = true;
                     comm.read(file);
-                    std::cout << "Found COMM header" << std::endl;
                     break;
                 }
                 throw std::runtime_error("Multiple COMM headers found, invalid file");
@@ -108,7 +104,6 @@ void sk::headers::AIFFHeader::read(std::ifstream& file) {
                 if (!foundSSND) {
                     foundSSND = true;
                     ssnd.read(file);
-                    std::cout << "Found SSND header" << std::endl;
                     break;
                 }
                 throw std::runtime_error("Multiple SSND headers found, invalid file");

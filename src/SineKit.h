@@ -81,6 +81,7 @@ namespace sk {
         void loadFile(const std::filesystem::path& input_path);
         void writeFile(const std::filesystem::path& output_path) const;
         void updateHeaders();
+        void toBitDepth(BitType bitType);
     };
 
 }
