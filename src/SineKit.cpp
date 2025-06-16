@@ -442,6 +442,15 @@ struct SpreadDataArgs {
 };
 
 template<typename T>
+struct InterpolatedDataArgs {
+    std::int64_t rangeStart;
+    std::int64_t rangeEnd;
+    std::int16_t scale;
+    std::int16_t channels;
+    sk::AudioBuffer<T>* end;
+};
+
+template<typename T>
 void* spreadData(void* args) {
     auto* data = static_cast<SpreadDataArgs<T>*>(args);
     for (std::int16_t i = 0; i < data->channels; i++) {
@@ -452,28 +461,128 @@ void* spreadData(void* args) {
     return nullptr;
 }
 
+template<typename T>
+void* interpolateData(void* args) {
+    auto* data = static_cast<InterpolatedDataArgs<T>*>(args);
+    for (std::int16_t i = 0; i < data->channels; i++) {
+        for (std::int64_t j = data->rangeStart; j < data->rangeEnd; j++) {
+            long double ptAy = data->end.channels.at(i).at(j * data->scale);
+            long double ptBy = data->end.channels.at(i).at((j + 1) * data->scale);
+            long double delta = (ptBy - ptAy) / static_cast<long double>(data->scale);
+
+            for (int k = 1; k < data->scale; k++) {
+                data->end.channels.at(i).at(j * data->scale + k) = ptAy + delta * k;
+            }
+        }
+    }
+    return nullptr;
+}
+
 
 template<typename T>
 void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer) {
     AudioBuffer<T> tempBuffer;
     tempBuffer.resize(NumChannels_, NumFrames_*scale);
-    pthread_t thread;
+    constexpr int NumThreads = 8;
+    std::int64_t rangeSize = (NumFrames_ - NumFrames_%NumThreads)/NumThreads;
+    std::vector<pthread_t> threads;
+    threads.resize(NumThreads);
+    std::vector<SpreadDataArgs<T>> args;
+    args.resize(NumThreads);
 
-    // Prepare arguments for pthread_create
-    SpreadDataArgs<T>* args = new SpreadDataArgs<T>{
-        0,
-        static_cast<std::int64_t>(NumFrames_),
+    for (int i = 0; i < NumThreads - 1; i++) {
+        args.at(i) = {
+        i*rangeSize,
+        (i+1)*rangeSize,
+        static_cast<std::int16_t>(scale),
+            static_cast<std::int16_t>(NumChannels_),
+        &buffer,
+        &tempBuffer
+        };
+    }
+    args.at(NumThreads - 1) = {
+        (NumThreads - 1)*rangeSize,
+        NumFrames_,
         static_cast<std::int16_t>(scale),
         static_cast<std::int16_t>(NumChannels_),
         &buffer,
         &tempBuffer
     };
 
-    pthread_create(&thread, nullptr, spreadData<T>, static_cast<void*>(args));
-    pthread_join(thread, nullptr);
-    delete args;
 
-    if (interpolation == 1) {
+    for (int i = 0; i < NumThreads; i++) {
+        pthread_create(&threads.at(i), nullptr, spreadData<T>, static_cast<void*>(&args.at(i)));
+    }
+
+    for (int i = 0; i < NumThreads; i++) {
+        pthread_join(threads.at(i), nullptr);
+    }
+
+    for (int i = 0; i < NumThreads; i++) {
+        free(threads.at(i));
+    }
+
+    threads.clear();
+
+    std::vector<InterpolatedDataArgs<T>> args2;
+    args2.resize(NumThreads);
+    for (int i = 0; i < NumThreads - 1; i++) {
+        args2.at(i) = {
+        i*rangeSize,
+        (i+1)*rangeSize,
+        static_cast<std::int16_t>(scale),
+        static_cast<std::int16_t>(NumChannels_),
+        &tempBuffer
+        };
+    }
+
+    args2.at(NumThreads - 1) = {
+    (NumThreads - 1)*rangeSize,
+    NumFrames_,
+    static_cast<std::int16_t>(scale),
+    static_cast<std::int16_t>(NumChannels_),
+    &tempBuffer
+    };
+
+    for (int i = 0; i < NumThreads; i++) {
+        pthread_create(&threads.at(i), nullptr, interpolateData<T>, static_cast<void*>(&args2.at(i)));
+    }
+
+    for (int i = 0; i < NumThreads; i++) {
+        pthread_join(threads.at(i), nullptr);
+    }
+
+    for (int i = 0; i < NumThreads; i++) {
+        free(threads.at(i));
+    }
+
+    threads.clear();
+
+    for (int i = 0; i < NumThreads - 2; i++) {
+        args2.at(i) = {
+            (i+1)*rangeSize,
+            (i+1)*rangeSize,
+            static_cast<std::int16_t>(scale),
+            static_cast<std::int16_t>(NumChannels_),
+            &tempBuffer
+            };
+    }
+
+    for (int i = 0; i < NumThreads - 2; i++) {
+        pthread_create(&threads.at(i), nullptr, interpolateData<T>, static_cast<void*>(&args2.at(i)));
+    }
+
+    for (int i = 0; i < NumThreads; i++) {
+        pthread_join(threads.at(i), nullptr);
+    }
+
+    for (int i = 0; i < NumThreads; i++) {
+        free(threads.at(i));
+    }
+
+    threads.clear();
+
+    /*if (interpolation == 1) {
         for (std::int64_t i = 0; i < NumChannels_; i++) {
             for (std::int64_t j = 0; j < static_cast<int>(NumFrames_) - 1; j++) {
                 long double ptAy = tempBuffer.channels.at(i).at(j * scale);
@@ -486,7 +595,7 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
                 }
             }
         }
-    }
+    }*/
     buffer.resize(NumChannels_, NumFrames_*scale);
     buffer = tempBuffer;
 }
