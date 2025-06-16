@@ -429,16 +429,50 @@ void sk::SineKit::toBitDepth(BitType bitType) {
     }
 }
 
+
+// --- SpreadDataArgs and spreadData for pthread usage ---
+template<typename T>
+struct SpreadDataArgs {
+    std::int64_t rangeStart;
+    std::int64_t rangeEnd;
+    std::int16_t scale;
+    std::int16_t channels;
+    sk::AudioBuffer<T>* start;
+    sk::AudioBuffer<T>* end;
+};
+
+template<typename T>
+void* spreadData(void* args) {
+    auto* data = static_cast<SpreadDataArgs<T>*>(args);
+    for (std::int16_t i = 0; i < data->channels; i++) {
+        for (std::int64_t j = data->rangeStart; j < data->rangeEnd; j++) {
+            data->end->channels.at(i).at(j * data->scale) = data->start->channels.at(i).at(j);
+        }
+    }
+    return nullptr;
+}
+
+
 template<typename T>
 void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer) {
     AudioBuffer<T> tempBuffer;
     tempBuffer.resize(NumChannels_, NumFrames_*scale);
-    for (std::int64_t i = 0; i < NumChannels_; i++) {
-        for (std::int64_t j = NumFrames_ - 1; j >= 0; j--) {
-            tempBuffer.channels.at(i).at(j*scale) = buffer.channels.at(i).at(j);
-            std::cout << buffer.channels.at(i).at(j) << " | " << tempBuffer.channels.at(i).at(j*scale) << std::endl;
-        }
-    }
+    pthread_t thread;
+
+    // Prepare arguments for pthread_create
+    SpreadDataArgs<T>* args = new SpreadDataArgs<T>{
+        0,
+        static_cast<std::int64_t>(NumFrames_),
+        static_cast<std::int16_t>(scale),
+        static_cast<std::int16_t>(NumChannels_),
+        &buffer,
+        &tempBuffer
+    };
+
+    pthread_create(&thread, nullptr, spreadData<T>, static_cast<void*>(args));
+    pthread_join(thread, nullptr);
+    delete args;
+
     if (interpolation == 1) {
         for (std::int64_t i = 0; i < NumChannels_; i++) {
             for (std::int64_t j = 0; j < static_cast<int>(NumFrames_) - 1; j++) {
@@ -455,7 +489,6 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
     }
     buffer.resize(NumChannels_, NumFrames_*scale);
     buffer = tempBuffer;
-    tempBuffer.clear();
 }
 
 
