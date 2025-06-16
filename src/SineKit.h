@@ -19,6 +19,7 @@
 #include "headers/AIFFHeaders.h"
 #include "headers/HeaderTags.h"
 #include <functional>
+#include <pthread.h>
 
 
 namespace sk {
