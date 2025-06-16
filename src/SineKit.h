@@ -18,13 +18,14 @@
 #include "headers/WAVHeaders.h"
 #include "headers/AIFFHeaders.h"
 #include "headers/HeaderTags.h"
+#include <functional>
 
 
 namespace sk {
 
     enum class AudioType {Undefined, PCM, DSD};
 
-    enum class BitType : std::uint16_t { Undefined = 0, I16 = 16, I24 = 24, F32 = 32, F64 = 64 };
+    enum class BitType : std::uint16_t { Undefined = 0, I8 = 8, I16 = 16, I24 = 24, F32 = 32, F64 = 64 };
 
     enum class SampleRate : std::uint32_t {
         Undefined   =   0,
@@ -54,6 +55,8 @@ namespace sk {
 
         T&       operator()(std::size_t c, std::size_t f)       { return channels[c][f]; }
         const T& operator()(std::size_t c, std::size_t f) const { return channels[c][f]; }
+        void clear();
+
     };
 
     class SineKit {
@@ -65,16 +68,19 @@ namespace sk {
         SampleRate              SampleRate_     {SampleRate::Undefined};
         std::uint16_t           NumChannels_    {0};
         std::uint32_t           NumFrames_      {0};
-        AudioBuffer<int16_t>    Buffer16_;
-        AudioBuffer<int32_t>    Buffer24_;
-        AudioBuffer<float>      Buffer32f_;
-        AudioBuffer<double>     Buffer64f_;
+        AudioBuffer<std::uint8_t>    Buffer8I_;
+        AudioBuffer<std::int16_t>    Buffer16I_;
+        AudioBuffer<std::int32_t>    Buffer24I_;
+        AudioBuffer<std::int32_t>    Buffer32I_;
+        AudioBuffer<float>      Buffer32F_;
+        AudioBuffer<double>     Buffer64F_;
 
         template<typename T>
-        static void readInterleaved (std::ifstream&, AudioBuffer<T>&, std::size_t frames, std::size_t ch, sk::endian::Endian fileEndian);
+        static void readInterleaved (std::ifstream&, AudioBuffer<T>&, std::size_t frames, std::size_t ch, sk::endian::Endian fileEndian, sk::BitType bitType);
 
         template<typename T>
-        static void writeInterleaved(std::ofstream&, const AudioBuffer<T>&, std::size_t frames, std::size_t ch, sk::endian::Endian fileEndian);
+        static void writeInterleaved(std::ofstream&, const AudioBuffer<T>&, std::size_t frames, std::size_t ch, sk::endian::Endian fileEndian, sk::BitType bitType);
+        void clearBut(sk::BitType bitType);
 
     public:
 
