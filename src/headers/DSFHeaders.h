@@ -14,6 +14,8 @@ namespace sk::headers::DSF {
         std::uint64_t ChunkSize = 28;
         std::uint64_t FileSize = 0;
         std::uint64_t MetaPtr = 0;
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
     };
 
     struct FMTHeader {
@@ -28,6 +30,8 @@ namespace sk::headers::DSF {
         std::uint64_t NumSamples = 0;
         std::uint32_t BlockSize = 4096;
         std::uint32_t Reserved = 0;
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
     };
 }
 
