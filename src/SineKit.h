@@ -23,6 +23,7 @@
 
 namespace sk {
 
+
     enum class AudioType {Undefined, PCM, DSD};
 
     enum class BitType : std::uint16_t { Undefined = 0, I8 = 8, I16 = 16, I24 = 24, F32 = 32, F64 = 64 };
@@ -43,6 +44,9 @@ namespace sk {
         DSD512      =   22579200
     };
 
+    enum class InterpolationOrder : std::uint8_t { Default = 3, Linear = 1, Quadratic = 2, Cubic = 3, Quartic = 4};
+    enum class DitherAmount {None, Low, Medium, High};
+
     template<typename T>
     struct AudioBuffer {
         std::vector<std::vector<T>> channels;
@@ -58,6 +62,7 @@ namespace sk {
         void clear();
 
     };
+
 
     class SineKit {
     private:
@@ -81,13 +86,17 @@ namespace sk {
         template<typename T>
         static void writeInterleaved(std::ofstream&, const AudioBuffer<T>&, std::size_t frames, std::size_t ch, sk::endian::Endian fileEndian, sk::BitType bitType);
         void clearBut(sk::BitType bitType);
+        void updateHeaders();
+
+        template<typename T>
+        void upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer);
 
     public:
 
         void loadFile(const std::filesystem::path& input_path);
         void writeFile(const std::filesystem::path& output_path) const;
-        void updateHeaders();
         void toBitDepth(BitType bitType);
+        void toSampleRate(SampleRate sampleRate);
     };
 
 }

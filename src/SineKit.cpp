@@ -2,7 +2,7 @@
 
 void sk::SineKit::clearBut(sk::BitType bitType) {
     switch (bitType) {
-        case BitType::I8 : {
+        case BitType::I8: {
             //Buffer8I_.clear();
             Buffer16I_.clear();
             Buffer24I_.clear();
@@ -428,3 +428,72 @@ void sk::SineKit::toBitDepth(BitType bitType) {
             throw std::runtime_error("unsupported bit depth conversion");
     }
 }
+
+template<typename T>
+void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer) {
+    AudioBuffer<T> tempBuffer;
+    tempBuffer.resize(NumChannels_, NumFrames_*scale);
+    for (std::int64_t i = 0; i < NumChannels_; i++) {
+        for (std::int64_t j = NumFrames_ - 1; j >= 0; j--) {
+            tempBuffer.channels.at(i).at(j*scale) = buffer.channels.at(i).at(j);
+            std::cout << buffer.channels.at(i).at(j) << " | " << tempBuffer.channels.at(i).at(j*scale) << std::endl;
+        }
+    }
+    if (interpolation == 1) {
+        for (std::int64_t i = 0; i < NumChannels_; i++) {
+            for (std::int64_t j = 0; j < static_cast<int>(NumFrames_) - 1; j++) {
+                long double ptAy = tempBuffer.channels.at(i).at(j * scale);
+                long double ptBy = tempBuffer.channels.at(i).at((j + 1) * scale);
+                long double delta = (ptBy - ptAy) / static_cast<long double>(scale);
+
+                for (int k = 1; k < scale; k++) {
+                    tempBuffer.channels.at(i).at(j * scale + k) = ptAy + delta * k;
+                    std::cout << tempBuffer.channels.at(i).at(j * scale + k) << std::endl;
+                }
+            }
+        }
+    }
+    buffer.resize(NumChannels_, NumFrames_*scale);
+    buffer = tempBuffer;
+    tempBuffer.clear();
+}
+
+
+void sk::SineKit::toSampleRate(SampleRate sampleRate) {
+    switch (sampleRate) {
+        case SampleRate::P88K2 : {
+            switch (SampleRate_) {
+                case SampleRate::P88K2 : break;
+                case SampleRate::P44K1 : {
+                    switch (BitType_) {
+                        case BitType::I8 : {
+                            upsample(2,1,Buffer8I_);
+                            break;
+                        }
+                        case BitType::I16: {
+                            upsample(2,1,Buffer16I_);
+                            break;
+                        }
+                        case BitType::I24: {
+                            upsample(2,1,Buffer24I_);
+                            break;
+                        }
+                        case BitType::F32: {
+                            upsample(2,1,Buffer32F_);
+                            break;
+                        }
+                        case BitType::F64: {
+                            upsample(2,1,Buffer64F_);
+                            break;
+                        }
+                    }
+
+                }
+            }
+            SampleRate_ = SampleRate::P88K2;
+            NumFrames_ = NumFrames_ * 2;
+            updateHeaders();
+        }
+    }
+}
+

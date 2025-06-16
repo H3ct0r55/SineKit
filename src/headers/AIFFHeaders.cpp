@@ -60,7 +60,7 @@ void sk::headers::AIFF::SSNDHeader::read(std::ifstream& file) {
     BlockSize = sk::endian::read_be<decltype(BlockSize)>(file);
 }
 
-void sk::headers::AIFF::COMMHeader::readComp(std::ifstream &file) {
+void sk::headers::AIFF::COMMCompressionHeader::read(std::ifstream &file) {
     file.read(CompType.v, sizeof(CompType.v));
     CompName.Size = sk::endian::read_be<decltype(CompName.Size)>(file);
     file.read(CompType.v, sizeof(CompType.v));
@@ -74,7 +74,7 @@ void sk::headers::AIFF::SSNDHeader::write(std::ofstream& file) const {
     sk::endian::write_be<decltype(BlockSize)>(file, BlockSize);
 }
 
-void sk::headers::AIFF::COMMHeader::writeComp(std::ofstream &file) const {
+void sk::headers::AIFF::COMMCompressionHeader::write(std::ofstream &file) const {
     file.write(CompType.v, sizeof(CompType.v));
     sk::endian::write_be<decltype(CompName.Size)>(file, CompName.Size);
     file.write(CompName.v, sizeof(CompName.v));
@@ -116,7 +116,7 @@ void sk::headers::AIFF::AIFFHeader::read(std::ifstream& file) {
                     foundCOMM = true;
                     comm.read(file);
                     if (readAIFC) {
-                        comm.readComp(file);
+                        comp.read(file);
                     }
                     break;
                 }
@@ -148,7 +148,7 @@ void sk::headers::AIFF::AIFFHeader::write(std::ofstream& file) const {
     form.write(file);
     comm.write(file);
     if (std::strncmp(form.FormType.v, "AIFC", 4) == 0) {
-        comm.writeComp(file);
+        comp.write(file);
     }
     ssnd.write(file);
 }
@@ -186,13 +186,13 @@ void sk::headers::AIFF::AIFFHeader::update(std::uint16_t bitDepth, std::uint32_t
         form.FormType = {{'A','I','F','C'}};
         switch (bitDepth) {
             case 32: {
-                comm.CompType = {{'f','l','3','2'}};
-                comm.CompName = {12, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
+                comp.CompType = {{'f','l','3','2'}};
+                comp.CompName = {12, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
                 break;
             }
             case 64: {
-                comm.CompType = {{'f','l','6','4'}};
-                comm.CompName = {12, {'F','l','o','a','t',' ','6','4','-','b','i','t',0x00}};
+                comp.CompType = {{'f','l','6','4'}};
+                comp.CompName = {12, {'F','l','o','a','t',' ','6','4','-','b','i','t',0x00}};
                 break;
             }
             default: break;

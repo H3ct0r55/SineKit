@@ -25,14 +25,17 @@ namespace sk::headers::AIFF {
         std::uint32_t   NumSamples  {0};
         std::int16_t    BitDepth    {0};
         Float80         SampleRate  {0};
+        void read(std::ifstream& file);
+        void write(std::ofstream& file) const;
+    };
+    std::ostream& operator<<(std::ostream& os, const COMMHeader& input);
+
+    struct COMMCompressionHeader {
         headers::Tag    CompType {{'f','l','3','2'}};
         headers::PascalString   CompName {12, {'F','l','o','a','t',' ','3','2','-','b','i','t',0x00}};
         void read(std::ifstream& file);
-        void readComp(std::ifstream& file);
         void write(std::ofstream& file) const;
-        void writeComp(std::ofstream& file) const;
     };
-    std::ostream& operator<<(std::ostream& os, const COMMHeader& input);
 
     struct SSNDHeader {
         headers::Tag             ChunkID     {{'S','S','N','D'}};
@@ -46,6 +49,7 @@ namespace sk::headers::AIFF {
     struct AIFFHeader {
         FORMHeader      form;
         COMMHeader      comm;
+        COMMCompressionHeader comp;
         SSNDHeader      ssnd;
         void read(std::ifstream& file);
         void write(std::ofstream& file) const;
