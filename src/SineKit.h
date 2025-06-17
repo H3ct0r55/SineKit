@@ -19,7 +19,11 @@
 #include "headers/AIFFHeaders.h"
 #include "headers/HeaderTags.h"
 #include <functional>
+#include <cmath>
 
+#ifdef USE_THREADING
+#include <pthread.h>
+#endif
 
 namespace sk {
 
@@ -44,7 +48,7 @@ namespace sk {
         DSD512      =   22579200
     };
 
-    enum class InterpolationOrder : std::uint8_t { Default = 3, Linear = 1, Quadratic = 2, Cubic = 3, Quartic = 4};
+    enum class InterpolationOrder : std::uint8_t { Default = 3, Linear = 1, Quadratic = 2, Cubic = 3, Quartic = 4, Sinc = 5};
     enum class DitherAmount {None, Low, Medium, High};
 
     template<typename T>
@@ -89,7 +93,7 @@ namespace sk {
         void updateHeaders();
 
         template<typename T>
-        void upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer);
+        void upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType);
 
     public:
 

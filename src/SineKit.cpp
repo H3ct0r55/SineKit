@@ -429,16 +429,38 @@ void sk::SineKit::toBitDepth(BitType bitType) {
     }
 }
 
+#ifdef USE_THREADING
+void* upsampleThread(void* arg) {
+    
+}
+#endif
+
 template<typename T>
-void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer) {
+void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType) {
     AudioBuffer<T> tempBuffer;
     tempBuffer.resize(NumChannels_, NumFrames_*scale);
+    double clampMin = 0;
+    double clampMax = 0;
+    switch (bitType) {
+        case BitType::I8 : clampMin = 0; clampMax = 255; break;
+        case BitType::I16: clampMin = -32768; clampMax = 32767; break;
+        case BitType::I24: clampMin = -8388608; clampMax = 8388607; break;
+    }
+
     for (std::int64_t i = 0; i < NumChannels_; i++) {
         for (std::int64_t j = NumFrames_ - 1; j >= 0; j--) {
             tempBuffer.channels.at(i).at(j*scale) = buffer.channels.at(i).at(j);
-            std::cout << buffer.channels.at(i).at(j) << " | " << tempBuffer.channels.at(i).at(j*scale) << std::endl;
         }
     }
+
+    for (std::int64_t i = 0; i < NumChannels_; i++) {
+        for (std::int64_t j = 0; j < NumFrames_*scale; j++) {
+            if (j%scale != 0) {
+                tempBuffer.channels.at(i).at(j) = 0;
+            }
+        }
+    }
+
     if (interpolation == 1) {
         for (std::int64_t i = 0; i < NumChannels_; i++) {
             for (std::int64_t j = 0; j < static_cast<int>(NumFrames_) - 1; j++) {
@@ -448,15 +470,45 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
 
                 for (int k = 1; k < scale; k++) {
                     tempBuffer.channels.at(i).at(j * scale + k) = ptAy + delta * k;
-                    std::cout << tempBuffer.channels.at(i).at(j * scale + k) << std::endl;
+
+                }
+            }
+        }
+    } else if (interpolation == 5) {
+        std::vector<T> window;
+        window.resize(4097);
+        AudioBuffer<T> bufferCache;
+        bufferCache.resize(NumChannels_, NumFrames_*scale);
+        bufferCache = tempBuffer;
+        for (std::int64_t i = 0; i < NumChannels_; i++) {
+            for (std::int64_t j = 0; j < NumFrames_*scale; j++) {
+                if (j%scale != 0) {
+                    for (std::int64_t k = -2048; k < 2049; k++) {
+                        if (j+k < 0 || j+k >= NumFrames_*scale) {
+                            window.at(k+2048) = 0;
+                        } else {
+                            window.at(k+2048) = bufferCache.channels.at(i).at(j + k);
+                        }
+                    }
+                    double interpolated = 0;
+                    for (std::int64_t k = -2048; k < 2049; k++) {
+                        double w = (k == 0) ? 1.0 : std::sin(M_PI * k / scale) / (M_PI * k / scale);
+                        interpolated += w * window.at(k+2048);
+                    }
+                    tempBuffer.channels.at(i).at(j) = static_cast<T>(std::clamp(std::round(interpolated), clampMin, clampMax));
                 }
             }
         }
     }
+
+
+
     buffer.resize(NumChannels_, NumFrames_*scale);
     buffer = tempBuffer;
     tempBuffer.clear();
 }
+
+
 
 
 void sk::SineKit::toSampleRate(SampleRate sampleRate) {
@@ -467,23 +519,23 @@ void sk::SineKit::toSampleRate(SampleRate sampleRate) {
                 case SampleRate::P44K1 : {
                     switch (BitType_) {
                         case BitType::I8 : {
-                            upsample(2,1,Buffer8I_);
+                            upsample(2,5,Buffer8I_, BitType_);
                             break;
                         }
                         case BitType::I16: {
-                            upsample(2,1,Buffer16I_);
+                            upsample(2,5,Buffer16I_, BitType_);
                             break;
                         }
                         case BitType::I24: {
-                            upsample(2,1,Buffer24I_);
+                            upsample(2,5,Buffer24I_, BitType_);
                             break;
                         }
                         case BitType::F32: {
-                            upsample(2,1,Buffer32F_);
+                            upsample(2,5,Buffer32F_, BitType_);
                             break;
                         }
                         case BitType::F64: {
-                            upsample(2,1,Buffer64F_);
+                            upsample(2,5,Buffer64F_, BitType_);
                             break;
                         }
                     }
