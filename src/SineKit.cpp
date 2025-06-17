@@ -1,4 +1,5 @@
 #include "SineKit.h"
+#include <algorithm>   // for std::clamp
 
 void sk::SineKit::clearBut(sk::BitType bitType) {
     switch (bitType) {
@@ -430,83 +431,165 @@ void sk::SineKit::toBitDepth(BitType bitType) {
 }
 
 #ifdef USE_THREADING
-void* upsampleThread(void* arg) {
-    
+#include <thread>
+template <typename T>
+struct sincThreadArgs {
+    std::int64_t sampleStart;   // first sample index (already scaled)
+    std::int64_t sampleEnd;     // one‑past‑last index
+    std::int64_t numChannels;
+    std::int64_t scale;
+    sk::AudioBuffer<T>* buffer; // destination/out buffer
+    double clampMin;
+    double clampMax;
+};
+
+template <typename T>
+void* sincUpsampleThread(void* args) {
+    auto* data = static_cast<sincThreadArgs<T>*>(args);
+
+    std::vector<T> window(4097);         // ±2048 + centre
+    sk::AudioBuffer<T> srcSnapshot;      // immutable copy for reads
+    srcSnapshot = *data->buffer;         // cheap move‑elided copy
+
+    for (std::int64_t ch = 0; ch < data->numChannels; ++ch) {
+        for (std::int64_t j = data->sampleStart; j < data->sampleEnd; ++j) {
+            if (j % data->scale == 0) continue; // keep originals
+
+            // build window around j (read‑only from snapshot)
+            for (std::int64_t k = -2048; k <= 2048; ++k) {
+                std::int64_t idx = j + k;
+                if (idx < 0 || idx >= static_cast<std::int64_t>(srcSnapshot.channels.at(ch).size()))
+                    window[k + 2048] = 0;
+                else
+                    window[k + 2048] = srcSnapshot.channels.at(ch).at(idx);
+            }
+
+            // sinc interpolate
+            long double accum = 0;
+            for (std::int64_t k = -2048; k <= 2048; ++k) {
+                long double x = static_cast<long double>(k) / data->scale;
+                long double w = (k == 0) ? 1.0L : std::sin(M_PI * x) / (M_PI * x);
+                accum += w * static_cast<long double>(window[k + 2048]);
+            }
+
+            // round, clamp to integer range, then cast
+            auto rounded = std::llround(accum);
+            auto clamped = std::clamp(rounded,
+                                      static_cast<long long>(data->clampMin),
+                                      static_cast<long long>(data->clampMax));
+            data->buffer->channels.at(ch).at(j) = static_cast<T>(clamped);
+        }
+    }
+    return nullptr;
 }
 #endif
 
 template<typename T>
-void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType) {
-    AudioBuffer<T> tempBuffer;
-    tempBuffer.resize(NumChannels_, NumFrames_*scale);
-    double clampMin = 0;
-    double clampMax = 0;
-    switch (bitType) {
-        case BitType::I8 : clampMin = 0; clampMax = 255; break;
-        case BitType::I16: clampMin = -32768; clampMax = 32767; break;
-        case BitType::I24: clampMin = -8388608; clampMax = 8388607; break;
-    }
-
-    for (std::int64_t i = 0; i < NumChannels_; i++) {
-        for (std::int64_t j = NumFrames_ - 1; j >= 0; j--) {
-            tempBuffer.channels.at(i).at(j*scale) = buffer.channels.at(i).at(j);
+    void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType) {
+        AudioBuffer<T> tempBuffer;
+        tempBuffer.resize(NumChannels_, NumFrames_*scale);
+        double clampMin = 0;
+        double clampMax = 0;
+        switch (bitType) {
+            case BitType::I8 : clampMin = 0; clampMax = 255; break;
+            case BitType::I16: clampMin = -32768; clampMax = 32767; break;
+            case BitType::I24: clampMin = -8388608; clampMax = 8388607; break;
         }
-    }
 
-    for (std::int64_t i = 0; i < NumChannels_; i++) {
-        for (std::int64_t j = 0; j < NumFrames_*scale; j++) {
-            if (j%scale != 0) {
-                tempBuffer.channels.at(i).at(j) = 0;
-            }
-        }
-    }
-
-    if (interpolation == 1) {
         for (std::int64_t i = 0; i < NumChannels_; i++) {
-            for (std::int64_t j = 0; j < static_cast<int>(NumFrames_) - 1; j++) {
-                long double ptAy = tempBuffer.channels.at(i).at(j * scale);
-                long double ptBy = tempBuffer.channels.at(i).at((j + 1) * scale);
-                long double delta = (ptBy - ptAy) / static_cast<long double>(scale);
-
-                for (int k = 1; k < scale; k++) {
-                    tempBuffer.channels.at(i).at(j * scale + k) = ptAy + delta * k;
-
-                }
+            for (std::int64_t j = NumFrames_ - 1; j >= 0; j--) {
+                tempBuffer.channels.at(i).at(j*scale) = buffer.channels.at(i).at(j);
             }
         }
-    } else if (interpolation == 5) {
-        std::vector<T> window;
-        window.resize(4097);
-        AudioBuffer<T> bufferCache;
-        bufferCache.resize(NumChannels_, NumFrames_*scale);
-        bufferCache = tempBuffer;
+
         for (std::int64_t i = 0; i < NumChannels_; i++) {
             for (std::int64_t j = 0; j < NumFrames_*scale; j++) {
                 if (j%scale != 0) {
-                    for (std::int64_t k = -2048; k < 2049; k++) {
-                        if (j+k < 0 || j+k >= NumFrames_*scale) {
-                            window.at(k+2048) = 0;
-                        } else {
-                            window.at(k+2048) = bufferCache.channels.at(i).at(j + k);
-                        }
-                    }
-                    double interpolated = 0;
-                    for (std::int64_t k = -2048; k < 2049; k++) {
-                        double w = (k == 0) ? 1.0 : std::sin(M_PI * k / scale) / (M_PI * k / scale);
-                        interpolated += w * window.at(k+2048);
-                    }
-                    tempBuffer.channels.at(i).at(j) = static_cast<T>(std::clamp(std::round(interpolated), clampMin, clampMax));
+                    tempBuffer.channels.at(i).at(j) = 0;
                 }
             }
         }
+    #ifdef USE_THREADING
+        std::int64_t NumThreads = std::thread::hardware_concurrency();
+        if (NumThreads <= 0) NumThreads = 4;
+        std::vector<sincThreadArgs<T>> threadArgs;
+        std::vector<pthread_t> threads;
+        threadArgs.resize(NumThreads);
+        threads.resize(NumThreads);
+        auto totalSamples = static_cast<std::int64_t>(NumFrames_) * scale;
+        std::int64_t samplesPerThread = totalSamples / NumThreads;
+
+        for (std::int64_t t = 0; t < NumThreads; ++t) {
+            std::int64_t start = t * samplesPerThread;
+            std::int64_t end   = (t == NumThreads - 1) ? totalSamples
+                                                       : (t + 1) * samplesPerThread;
+
+            threadArgs.at(t) = {
+                start,
+                end,
+                static_cast<std::int64_t>(NumChannels_),
+                static_cast<std::int64_t>(scale),
+                &tempBuffer,
+                clampMin,
+                clampMax
+            };
+        }
+
+        for (std::int64_t i = 0; i < NumThreads; i++) {
+            pthread_create(&threads.at(i), nullptr, sincUpsampleThread<T>, static_cast<void*>(&threadArgs.at(i)));
+        }
+
+        for (std::int64_t i = 0; i < NumThreads; i++) {
+            pthread_join(threads.at(i), nullptr);
+        }
+
+    #else
+        if (interpolation == 1) {
+            for (std::int64_t i = 0; i < NumChannels_; i++) {
+                for (std::int64_t j = 0; j < static_cast<int>(NumFrames_) - 1; j++) {
+                    long double ptAy = tempBuffer.channels.at(i).at(j * scale);
+                    long double ptBy = tempBuffer.channels.at(i).at((j + 1) * scale);
+                    long double delta = (ptBy - ptAy) / static_cast<long double>(scale);
+
+                    for (int k = 1; k < scale; k++) {
+                        tempBuffer.channels.at(i).at(j * scale + k) = ptAy + delta * k;
+
+                    }
+                }
+            }
+        } else if (interpolation == 5) {
+            std::vector<T> window;
+            window.resize(4097);
+            AudioBuffer<T> bufferCache;
+            bufferCache.resize(NumChannels_, NumFrames_*scale);
+            bufferCache = tempBuffer;
+            for (std::int64_t i = 0; i < NumChannels_; i++) {
+                for (std::int64_t j = 0; j < NumFrames_*scale; j++) {
+                    if (j%scale != 0) {
+                        for (std::int64_t k = -2048; k < 2049; k++) {
+                            if (j+k < 0 || j+k >= NumFrames_*scale) {
+                                window.at(k+2048) = 0;
+                            } else {
+                                window.at(k+2048) = bufferCache.channels.at(i).at(j + k);
+                            }
+                        }
+                        double interpolated = 0;
+                        for (std::int64_t k = -2048; k < 2049; k++) {
+                            double w = (k == 0) ? 1.0 : std::sin(M_PI * k / scale) / (M_PI * k / scale);
+                            interpolated += w * window.at(k+2048);
+                        }
+                        tempBuffer.channels.at(i).at(j) = static_cast<T>(std::clamp(std::round(interpolated), clampMin, clampMax));
+                    }
+                }
+            }
+        }
+    #endif
+
+
+        buffer.resize(NumChannels_, NumFrames_*scale);
+        buffer = tempBuffer;
+        tempBuffer.clear();
     }
-
-
-
-    buffer.resize(NumChannels_, NumFrames_*scale);
-    buffer = tempBuffer;
-    tempBuffer.clear();
-}
 
 
 

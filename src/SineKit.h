@@ -20,10 +20,8 @@
 #include "headers/HeaderTags.h"
 #include <functional>
 #include <cmath>
-
-#ifdef USE_THREADING
-#include <pthread.h>
-#endif
+#include <pthread/pthread.h>
+#include <thread>
 
 namespace sk {
 
