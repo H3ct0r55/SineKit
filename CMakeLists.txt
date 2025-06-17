@@ -3,12 +3,6 @@ project(SineKit)
 
 set(CMAKE_CXX_STANDARD 23)
 
-option(USE_THREADING "Enable multithreaded support" ON)
-
-if(USE_THREADING)
-    add_definitions(-DUSE_THREADING)
-endif()
-
 add_library(SineKit STATIC src/SineKit.cpp
         src/SineKit.h
         src/lib/EndianHelpers.h
