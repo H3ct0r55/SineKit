@@ -477,10 +477,36 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
             break;
         }
         case 5 : {
+            std::int64_t windowDim = 2048;
+            std::int64_t halfSize = (windowDim - 1) / 2;
             std::vector<double> sincLUT;
-            sincLUT.resize(100001);
-            for (std::int64_t k = -50000; k < 50001; k++) {
-                sincLUT.at(k+50000) = (k == 0) ? 1.0 : std::sin(M_PI * k / scale) / (M_PI * k / scale);
+            sincLUT.resize(windowDim);
+
+
+            for (std::int64_t k = -halfSize; k <= halfSize; k++) {
+                // Normalized sinc: sin(pi * x) / (pi * x)
+                double x = static_cast<double>(k) / static_cast<double>(scale);
+                double sinc = (k == 0) ? 1.0 : std::sin(M_PI * x) / (M_PI * x);
+
+                // Position in [0, 1] for window functions
+                double normPos = static_cast<double>(k + halfSize) / (2.0 * halfSize);
+
+                // ====== SELECT ONE WINDOW BELOW ======
+
+                // -- No Window (Rectangular) --
+                double window = 1.0;
+
+                // -- Hann Window --
+                // double window = 0.5 * (1.0 + std::cos(2.0 * M_PI * normPos - M_PI));
+
+                // -- Hamming Window --
+                // double window = 0.54 - 0.46 * std::cos(2.0 * M_PI * normPos);
+
+                // -- Blackman Window --
+                // double window = 0.42 - 0.5 * std::cos(2.0 * M_PI * normPos) + 0.08 * std::cos(4.0 * M_PI * normPos);
+
+                // Final value
+                sincLUT.at(k + halfSize) = sinc * window;
             }
             AudioBuffer<T> bufferCache;
             bufferCache.resize(NumChannels_, uFrames);
@@ -491,14 +517,11 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
                         for (std::int64_t j = 0; j < uFrames; j++) {
                             if (j%scale != 0) {
                                 double interpolated = 0;
-                                for (std::int64_t k = -50000; k < 50001; k++) {
+                                for (std::int64_t k = -halfSize; k <= halfSize; k++) {
                                     std::int64_t idx = j+k;
-                                    interpolated += sincLUT.at(k+50000) * ((idx < 0 || idx >= uFrames) ? 0 : bufferCache.channels[i][idx]);
+                                    interpolated += sincLUT.at(k+halfSize) * ((idx < 0 || idx >= uFrames) ? 0 : bufferCache.channels[i][idx]);
                                 }
                                 tempBuffer.channels[i][j] = static_cast<T>(std::clamp(std::round(interpolated), clampMin, clampMax));
-                            }
-                            if (j%10000 == 0) {
-                                std::cout << j << "/" << uFrames << " [CH: " << i+1 << "]" << std::endl;
                             }
                         }
                     }
@@ -509,14 +532,11 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
                         for (std::int64_t j = 0; j < uFrames; j++) {
                             if (j%scale != 0) {
                                 double interpolated = 0;
-                                for (std::int64_t k = -50000; k < 50001; k++) {
+                                for (std::int64_t k = -halfSize; k <= halfSize; k++) {
                                     std::int64_t idx = j+k;
-                                    interpolated += sincLUT.at(k+50000) * ((idx < 0 || idx >= uFrames) ? 0 : bufferCache.channels[i][idx]);
+                                    interpolated += sincLUT.at(k+halfSize) * ((idx < 0 || idx >= uFrames) ? 0 : bufferCache.channels[i][idx]);
                                 }
                                 tempBuffer.channels[i][j] = static_cast<T>(std::clamp(interpolated, clampMin, clampMax));
-                            }
-                            if (j%10000 == 0) {
-                                std::cout << j << "/" << uFrames << " [CH: " << i+1 << "]" << std::endl;
                             }
                         }
                     }
