@@ -437,73 +437,99 @@ void* upsampleThread(void* arg) {
 
 template<typename T>
 void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType) {
+    std::int64_t uFrames = NumFrames_*scale;
     AudioBuffer<T> tempBuffer;
-    tempBuffer.resize(NumChannels_, NumFrames_*scale);
+    tempBuffer.resize(NumChannels_, uFrames);
     double clampMin = 0;
     double clampMax = 0;
     switch (bitType) {
         case BitType::I8 : clampMin = 0; clampMax = 255; break;
         case BitType::I16: clampMin = -32768; clampMax = 32767; break;
         case BitType::I24: clampMin = -8388608; clampMax = 8388607; break;
+        case BitType::F32: clampMin = -10.0; clampMax = 10.0; break;
     }
 
     for (std::int64_t i = 0; i < NumChannels_; i++) {
         for (std::int64_t j = NumFrames_ - 1; j >= 0; j--) {
-            tempBuffer.channels.at(i).at(j*scale) = buffer.channels.at(i).at(j);
+            tempBuffer.channels[i][j*scale] = buffer.channels[i][j];
         }
-    }
-
-    for (std::int64_t i = 0; i < NumChannels_; i++) {
-        for (std::int64_t j = 0; j < NumFrames_*scale; j++) {
+        for (std::int64_t j = 0; j < uFrames; j++) {
             if (j%scale != 0) {
-                tempBuffer.channels.at(i).at(j) = 0;
+                tempBuffer.channels[i][j] = 0;
             }
         }
     }
 
-    if (interpolation == 1) {
-        for (std::int64_t i = 0; i < NumChannels_; i++) {
-            for (std::int64_t j = 0; j < static_cast<int>(NumFrames_) - 1; j++) {
-                long double ptAy = tempBuffer.channels.at(i).at(j * scale);
-                long double ptBy = tempBuffer.channels.at(i).at((j + 1) * scale);
-                long double delta = (ptBy - ptAy) / static_cast<long double>(scale);
+    switch (interpolation) {
+        case 1 : {
+            for (std::int64_t i = 0; i < NumChannels_; i++) {
+                for (std::int64_t j = 0; j < NumFrames_ - 1; j++) {
+                    long double ptAy = tempBuffer.channels.at(i).at(j * scale);
+                    long double ptBy = tempBuffer.channels.at(i).at((j + 1) * scale);
+                    long double delta = (ptBy - ptAy) / static_cast<long double>(scale);
 
-                for (int k = 1; k < scale; k++) {
-                    tempBuffer.channels.at(i).at(j * scale + k) = ptAy + delta * k;
+                    for (int k = 1; k < scale; k++) {
+                        tempBuffer.channels.at(i).at(j * scale + k) = ptAy + delta * k;
 
+                    }
                 }
             }
+            break;
         }
-    } else if (interpolation == 5) {
-        std::vector<T> window;
-        window.resize(4097);
-        AudioBuffer<T> bufferCache;
-        bufferCache.resize(NumChannels_, NumFrames_*scale);
-        bufferCache = tempBuffer;
-        for (std::int64_t i = 0; i < NumChannels_; i++) {
-            for (std::int64_t j = 0; j < NumFrames_*scale; j++) {
-                if (j%scale != 0) {
-                    for (std::int64_t k = -2048; k < 2049; k++) {
-                        if (j+k < 0 || j+k >= NumFrames_*scale) {
-                            window.at(k+2048) = 0;
-                        } else {
-                            window.at(k+2048) = bufferCache.channels.at(i).at(j + k);
+        case 5 : {
+            std::vector<double> sincLUT;
+            sincLUT.resize(100001);
+            for (std::int64_t k = -50000; k < 50001; k++) {
+                sincLUT.at(k+50000) = (k == 0) ? 1.0 : std::sin(M_PI * k / scale) / (M_PI * k / scale);
+            }
+            AudioBuffer<T> bufferCache;
+            bufferCache.resize(NumChannels_, uFrames);
+            bufferCache = tempBuffer;
+            switch (bitType) {
+                case BitType::I8 : case BitType::I16 : case BitType::I24 : {
+                    for (std::int64_t i = 0; i < NumChannels_; i++) {
+                        for (std::int64_t j = 0; j < uFrames; j++) {
+                            if (j%scale != 0) {
+                                double interpolated = 0;
+                                for (std::int64_t k = -50000; k < 50001; k++) {
+                                    std::int64_t idx = j+k;
+                                    interpolated += sincLUT.at(k+50000) * ((idx < 0 || idx >= uFrames) ? 0 : bufferCache.channels[i][idx]);
+                                }
+                                tempBuffer.channels[i][j] = static_cast<T>(std::clamp(std::round(interpolated), clampMin, clampMax));
+                            }
+                            if (j%10000 == 0) {
+                                std::cout << j << "/" << uFrames << " [CH: " << i+1 << "]" << std::endl;
+                            }
                         }
                     }
-                    double interpolated = 0;
-                    for (std::int64_t k = -2048; k < 2049; k++) {
-                        double w = (k == 0) ? 1.0 : std::sin(M_PI * k / scale) / (M_PI * k / scale);
-                        interpolated += w * window.at(k+2048);
+                    break;
+                }
+                case BitType::F32 : case BitType::F64 : {
+                    for (std::int64_t i = 0; i < NumChannels_; i++) {
+                        for (std::int64_t j = 0; j < uFrames; j++) {
+                            if (j%scale != 0) {
+                                double interpolated = 0;
+                                for (std::int64_t k = -50000; k < 50001; k++) {
+                                    std::int64_t idx = j+k;
+                                    interpolated += sincLUT.at(k+50000) * ((idx < 0 || idx >= uFrames) ? 0 : bufferCache.channels[i][idx]);
+                                }
+                                tempBuffer.channels[i][j] = static_cast<T>(std::clamp(interpolated, clampMin, clampMax));
+                            }
+                            if (j%10000 == 0) {
+                                std::cout << j << "/" << uFrames << " [CH: " << i+1 << "]" << std::endl;
+                            }
+                        }
                     }
-                    tempBuffer.channels.at(i).at(j) = static_cast<T>(std::clamp(std::round(interpolated), clampMin, clampMax));
+                    break;
                 }
             }
+            break;
         }
     }
 
 
 
-    buffer.resize(NumChannels_, NumFrames_*scale);
+    buffer.resize(NumChannels_, uFrames);
     buffer = tempBuffer;
     tempBuffer.clear();
 }
@@ -511,41 +537,42 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
 
 
 
-void sk::SineKit::toSampleRate(SampleRate sampleRate) {
-    switch (sampleRate) {
-        case SampleRate::P88K2 : {
-            switch (SampleRate_) {
-                case SampleRate::P88K2 : break;
-                case SampleRate::P44K1 : {
-                    switch (BitType_) {
-                        case BitType::I8 : {
-                            upsample(2,5,Buffer8I_, BitType_);
-                            break;
-                        }
-                        case BitType::I16: {
-                            upsample(2,5,Buffer16I_, BitType_);
-                            break;
-                        }
-                        case BitType::I24: {
-                            upsample(2,5,Buffer24I_, BitType_);
-                            break;
-                        }
-                        case BitType::F32: {
-                            upsample(2,5,Buffer32F_, BitType_);
-                            break;
-                        }
-                        case BitType::F64: {
-                            upsample(2,5,Buffer64F_, BitType_);
-                            break;
-                        }
-                    }
+void sk::SineKit::toSampleRate(SampleRate sampleRate)
+{
+    if (sampleRate == SampleRate_)
+        return;
 
-                }
-            }
-            SampleRate_ = SampleRate::P88K2;
-            NumFrames_ = NumFrames_ * 2;
-            updateHeaders();
-        }
+    const std::uint32_t dst = static_cast<std::uint32_t>(sampleRate);
+    const std::uint32_t src = static_cast<std::uint32_t>(SampleRate_);
+
+    if (src == 0 || dst == 0)
+        throw std::runtime_error("unsupported or undefined sample rate");
+
+    /* At the moment we only support *up‑sampling* by an *integer* factor.
+       Down‑sampling or non‑integer ratios will be added later. */
+    if (dst < src || (dst % src) != 0)
+        throw std::runtime_error("non‑integer or down‑sampling ratios not yet implemented");
+
+    const std::uint8_t scale = static_cast<std::uint8_t>(dst / src);
+    if (scale == 1)
+        return;   // should never happen, but guard anyway.
+
+    /* Upsample the active buffer in-place.  We only need to choose the buffer
+       based on the current BitType_.  This removes a large amount of duplicated
+       code and also means every new sample‑rate that is an integer multiple of
+       the current one “just works.” */
+    switch (BitType_) {
+        case BitType::I8:   upsample(scale, 5, Buffer8I_,  BitType_); break;
+        case BitType::I16:  upsample(scale, 5, Buffer16I_, BitType_); break;
+        case BitType::I24:  upsample(scale, 5, Buffer24I_, BitType_); break;
+        case BitType::F32:  upsample(scale, 5, Buffer32F_, BitType_); break;
+        case BitType::F64:  upsample(scale, 5, Buffer64F_, BitType_); break;
+        default:
+            throw std::runtime_error("unsupported bit depth for resampling");
     }
+
+    NumFrames_ *= scale;
+    SampleRate_  = sampleRate;
+    updateHeaders();
 }
 

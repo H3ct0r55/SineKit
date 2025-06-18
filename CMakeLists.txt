@@ -13,5 +13,4 @@ add_library(SineKit STATIC src/SineKit.cpp
         src/headers/HeaderTags.h
         src/headers/DSFHeaders.h
         src/headers/DSFHeaders.cpp
-        src/lib/CustomTypes.h
 )
