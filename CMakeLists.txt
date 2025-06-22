@@ -3,6 +3,11 @@ project(SineKit)
 
 set(CMAKE_CXX_STANDARD 23)
 
+set(Boost_NO_BOOST_CMAKE OFF)
+find_package(Boost REQUIRED CONFIG)
+
+include_directories(${Boost_INCLUDE_DIRS})
+
 add_library(SineKit STATIC src/SineKit.cpp
         src/SineKit.h
         src/lib/EndianHelpers.h

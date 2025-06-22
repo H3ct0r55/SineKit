@@ -47,6 +47,7 @@ void sk::SineKit::clearBut(sk::BitType bitType) {
             //Buffer64F_.clear();
             break;
         }
+        default: break;
     }
 }
 
@@ -429,24 +430,18 @@ void sk::SineKit::toBitDepth(BitType bitType) {
     }
 }
 
-#ifdef USE_THREADING
-void* upsampleThread(void* arg) {
-    
-}
-#endif
-
 template<typename T>
-void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType) {
+void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType, std::uint64_t windowSize, sk::WindowType windowType) {
     std::int64_t uFrames = NumFrames_*scale;
     AudioBuffer<T> tempBuffer;
     tempBuffer.resize(NumChannels_, uFrames);
-    double clampMin = 0;
-    double clampMax = 0;
+    long double clampMin = 0;
+    long double clampMax = 0;
     switch (bitType) {
         case BitType::I8 : clampMin = 0; clampMax = 255; break;
-        case BitType::I16: clampMin = -32768; clampMax = 32767; break;
-        case BitType::I24: clampMin = -8388608; clampMax = 8388607; break;
-        case BitType::F32: clampMin = -10.0; clampMax = 10.0; break;
+        case BitType::I16 : clampMin = -32768; clampMax = 32767; break;
+        case BitType::I24 : clampMin = -8388608; clampMax = 8388607; break;
+        default : break;
     }
 
     for (std::int64_t i = 0; i < NumChannels_; i++) {
@@ -462,50 +457,63 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
 
     switch (interpolation) {
         case 1 : {
-            for (std::int64_t i = 0; i < NumChannels_; i++) {
-                for (std::int64_t j = 0; j < NumFrames_ - 1; j++) {
-                    long double ptAy = tempBuffer.channels.at(i).at(j * scale);
-                    long double ptBy = tempBuffer.channels.at(i).at((j + 1) * scale);
-                    long double delta = (ptBy - ptAy) / static_cast<long double>(scale);
+            switch (bitType) {
+                case BitType::I8 : case BitType::I16 : case BitType::I24 : {
+                    for (std::int64_t i = 0; i < NumChannels_; i++) {
+                        for (std::int64_t j = 0; j < NumFrames_ - 1; j++) {
+                            long double ptAy = tempBuffer.channels.at(i).at(j * scale);
+                            long double ptBy = tempBuffer.channels.at(i).at((j + 1) * scale);
+                            long double delta = (ptBy - ptAy) / static_cast<long double>(scale);
 
-                    for (int k = 1; k < scale; k++) {
-                        tempBuffer.channels.at(i).at(j * scale + k) = ptAy + delta * k;
+                            for (int k = 1; k < scale; k++) {
+                                tempBuffer.channels[i][j * scale + k] = static_cast<T>(std::clamp(std::round(ptAy + delta * k), clampMin, clampMax));
 
+                            }
+                        }
                     }
+                    break;
                 }
+                case BitType::F32 : case BitType::F64 : {
+                    for (std::int64_t i = 0; i < NumChannels_; i++) {
+                        for (std::int64_t j = 0; j < NumFrames_ - 1; j++) {
+                            long double ptAy = tempBuffer.channels.at(i).at(j * scale);
+                            long double ptBy = tempBuffer.channels.at(i).at((j + 1) * scale);
+                            long double delta = (ptBy - ptAy) / static_cast<long double>(scale);
+
+                            for (int k = 1; k < scale; k++) {
+                                tempBuffer.channels[i][j * scale + k] = static_cast<T>(ptAy + delta * k);
+
+                            }
+                        }
+                    }
+                    break;
+                }
+                default : throw std::runtime_error("unsupported bit type called into upsample()");
             }
             break;
         }
         case 5 : {
-            std::int64_t windowDim = 2048;
+            // --- Windowed Sinc LUT Generation ---
+            double beta = 10; // typical value, adjust as needed
+            double denom = boost::math::cyl_bessel_i(0.0, beta);
+
+            auto windowDim = static_cast<std::int64_t>(windowSize);
             std::int64_t halfSize = (windowDim - 1) / 2;
-            std::vector<double> sincLUT;
+            std::vector<long double> sincLUT;
             sincLUT.resize(windowDim);
 
-
             for (std::int64_t k = -halfSize; k <= halfSize; k++) {
-                // Normalized sinc: sin(pi * x) / (pi * x)
-                double x = static_cast<double>(k) / static_cast<double>(scale);
-                double sinc = (k == 0) ? 1.0 : std::sin(M_PI * x) / (M_PI * x);
-
-                // Position in [0, 1] for window functions
-                double normPos = static_cast<double>(k + halfSize) / (2.0 * halfSize);
-
-                // ====== SELECT ONE WINDOW BELOW ======
-
-                // -- No Window (Rectangular) --
-                double window = 1.0;
-
-                // -- Hann Window --
-                // double window = 0.5 * (1.0 + std::cos(2.0 * M_PI * normPos - M_PI));
-
-                // -- Hamming Window --
-                // double window = 0.54 - 0.46 * std::cos(2.0 * M_PI * normPos);
-
-                // -- Blackman Window --
-                // double window = 0.42 - 0.5 * std::cos(2.0 * M_PI * normPos) + 0.08 * std::cos(4.0 * M_PI * normPos);
-
-                // Final value
+                long double x = static_cast<long double>(k) / static_cast<long double>(scale);
+                long double sinc = (k == 0) ? 1.0 : std::sin(M_PI * x) / (M_PI * x);
+                long double normPos = static_cast<long double>(k + halfSize) / (2.0 * static_cast<long double>(halfSize));
+                long double window = 0.0;
+                switch (windowType) {
+                    case WindowType::RECTANGULAR : window = 1.0; break;
+                    case WindowType::HAMMING : window = 0.54 - 0.46 * std::cos(2.0 * M_PI * normPos); break;
+                    case WindowType::HANNING : window = 0.5 * (1.0 + std::cos(2.0 * M_PI * normPos - M_PI)); break;
+                    case WindowType::BLACKMAN : window = 0.42 - 0.5 * std::cos(2.0 * M_PI * normPos) + 0.08 * std::cos(4.0 * M_PI * normPos); break;
+                    case WindowType::KAISER : long double r = 2.0 * normPos - 1.0; window = boost::math::cyl_bessel_i(0.0, beta * std::sqrt(1.0 - r * r)) / denom; break;
+                }
                 sincLUT.at(k + halfSize) = sinc * window;
             }
             AudioBuffer<T> bufferCache;
@@ -516,7 +524,7 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
                     for (std::int64_t i = 0; i < NumChannels_; i++) {
                         for (std::int64_t j = 0; j < uFrames; j++) {
                             if (j%scale != 0) {
-                                double interpolated = 0;
+                                long double interpolated = 0;
                                 for (std::int64_t k = -halfSize; k <= halfSize; k++) {
                                     std::int64_t idx = j+k;
                                     interpolated += sincLUT.at(k+halfSize) * ((idx < 0 || idx >= uFrames) ? 0 : bufferCache.channels[i][idx]);
@@ -531,20 +539,22 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
                     for (std::int64_t i = 0; i < NumChannels_; i++) {
                         for (std::int64_t j = 0; j < uFrames; j++) {
                             if (j%scale != 0) {
-                                double interpolated = 0;
+                                long double interpolated = 0;
                                 for (std::int64_t k = -halfSize; k <= halfSize; k++) {
                                     std::int64_t idx = j+k;
                                     interpolated += sincLUT.at(k+halfSize) * ((idx < 0 || idx >= uFrames) ? 0 : bufferCache.channels[i][idx]);
                                 }
-                                tempBuffer.channels[i][j] = static_cast<T>(std::clamp(interpolated, clampMin, clampMax));
+                                tempBuffer.channels[i][j] = static_cast<T>(interpolated);
                             }
                         }
                     }
                     break;
                 }
+                default : throw std::runtime_error("unsupported bit type called into upsample()");
             }
             break;
         }
+        default: throw std::runtime_error("unsupported interpolation type called into upsample()");
     }
 
 
@@ -556,14 +566,13 @@ void sk::SineKit::upsample(std::uint8_t scale, std::uint8_t interpolation, sk::A
 
 
 
-
 void sk::SineKit::toSampleRate(SampleRate sampleRate)
 {
     if (sampleRate == SampleRate_)
         return;
 
-    const std::uint32_t dst = static_cast<std::uint32_t>(sampleRate);
-    const std::uint32_t src = static_cast<std::uint32_t>(SampleRate_);
+    const auto dst = static_cast<std::uint32_t>(sampleRate);
+    const auto src = static_cast<std::uint32_t>(SampleRate_);
 
     if (src == 0 || dst == 0)
         throw std::runtime_error("unsupported or undefined sample rate");
@@ -573,7 +582,7 @@ void sk::SineKit::toSampleRate(SampleRate sampleRate)
     if (dst < src || (dst % src) != 0)
         throw std::runtime_error("non‑integer or down‑sampling ratios not yet implemented");
 
-    const std::uint8_t scale = static_cast<std::uint8_t>(dst / src);
+    const auto scale = static_cast<std::uint8_t>(dst / src);
     if (scale == 1)
         return;   // should never happen, but guard anyway.
 
@@ -582,11 +591,11 @@ void sk::SineKit::toSampleRate(SampleRate sampleRate)
        code and also means every new sample‑rate that is an integer multiple of
        the current one “just works.” */
     switch (BitType_) {
-        case BitType::I8:   upsample(scale, 5, Buffer8I_,  BitType_); break;
-        case BitType::I16:  upsample(scale, 5, Buffer16I_, BitType_); break;
-        case BitType::I24:  upsample(scale, 5, Buffer24I_, BitType_); break;
-        case BitType::F32:  upsample(scale, 5, Buffer32F_, BitType_); break;
-        case BitType::F64:  upsample(scale, 5, Buffer64F_, BitType_); break;
+        case BitType::I8:   upsample(scale, 5, Buffer8I_,  BitType_, 512, WindowType::KAISER); break;
+        case BitType::I16:  upsample(scale, 5, Buffer16I_, BitType_, 512, WindowType::KAISER); break;
+        case BitType::I24:  upsample(scale, 5, Buffer24I_, BitType_, 512, WindowType::KAISER); break;
+        case BitType::F32:  upsample(scale, 5, Buffer32F_, BitType_, 512, WindowType::KAISER); break;
+        case BitType::F64:  upsample(scale, 5, Buffer64F_, BitType_, 512, WindowType::KAISER); break;
         default:
             throw std::runtime_error("unsupported bit depth for resampling");
     }

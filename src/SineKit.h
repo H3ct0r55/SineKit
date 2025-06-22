@@ -20,6 +20,7 @@
 #include "headers/HeaderTags.h"
 #include <functional>
 #include <cmath>
+#include <boost/math/special_functions/bessel.hpp>
 
 #ifdef USE_THREADING
 #include <pthread.h>
@@ -46,6 +47,14 @@ namespace sk {
         DSD128      =   5644800,
         DSD256      =   11289600,
         DSD512      =   22579200
+    };
+
+    enum class WindowType : std::uint32_t {
+        RECTANGULAR = 0,
+        HAMMING = 1,
+        HANNING = 2,
+        BLACKMAN = 3,
+        KAISER = 4,
     };
 
     enum class InterpolationOrder : std::uint8_t { Default = 3, Linear = 1, Quadratic = 2, Cubic = 3, Quartic = 4, Sinc = 5};
@@ -93,7 +102,10 @@ namespace sk {
         void updateHeaders();
 
         template<typename T>
-        void upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType);
+        void upsample(std::uint8_t scale, std::uint8_t interpolation, sk::AudioBuffer<T> &buffer, sk::BitType bitType, std::uint64_t windowSize, sk::WindowType windowType);
+
+        template<typename T>
+        void upsampleNonInt(std::int8_t interpolation, std::int64_t base, std::int64_t target, sk::AudioBuffer<T> &buffer, sk::BitType bitType, std::uint64_t windowSize, sk::WindowType windowType);
 
     public:
 
