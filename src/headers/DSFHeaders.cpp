@@ -15,7 +15,6 @@ void sk::headers::DSF::DSDHeader::read(std::ifstream &file) {
     MetaPtr = sk::endian::read_le<decltype(MetaPtr)>(file);
 }
 
-
 void sk::headers::DSF::DSDHeader::write(std::ofstream &file) const {
     file.write(ChunkID.v, sizeof(ChunkID.v));
     sk::endian::write_le<decltype(ChunkSize)>(file, ChunkSize);

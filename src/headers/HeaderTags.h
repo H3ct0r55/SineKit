@@ -8,18 +8,20 @@
 #include <iostream>
 
 namespace sk::headers {
-    struct Tag {char v[4];};
-    inline std::ostream& operator<<(std::ostream& os, const Tag& input) {
-        for (char c : input.v) {
-            os << c;
-        }
-        return os;
+struct Tag {
+    char v[4];
+};
+inline std::ostream &operator<<(std::ostream &os, const Tag &input) {
+    for (char c : input.v) {
+        os << c;
     }
-
-    struct PascalString {
-        uint8_t Size;
-        char v[13];
-    };
+    return os;
 }
 
-#endif //HEADERTAGS_H
+struct PascalString {
+    uint8_t Size;
+    char v[13];
+};
+} // namespace sk::headers
+
+#endif // HEADERTAGS_H
